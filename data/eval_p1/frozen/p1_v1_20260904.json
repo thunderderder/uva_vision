@@ -1,0 +1,95 @@
+{
+  "id": "p1_v1_20260904",
+  "frozen_at": "2026-09-04",
+  "purpose": "P1 钓鱼人/游泳人：prompt + 看图方式冻结，后面改词先对照这一版。",
+  "model": {
+    "qwen": "model\\vl\\qwen-vl\\2B-Instruct",
+    "yolo": "model\\yolo\\yolov8s-world.pt"
+  },
+  "layout": {
+    "rtmp": "full_frame",
+    "file": "full_frame"
+  },
+  "prompt_sha256": "db25801b790eb4c08fad26cf80c13cacc7c24abc9310c2bb21c91240a4046c99",
+  "prompt_file": "p1_v1_20260904.prompt.txt",
+  "vlm_alert_guide": {
+    "fishing": "已经确认是人，并且贴着水面：水边坐蹲、船上、面向水体。看不见竿、网也算。水草枯枝不是人。",
+    "swimming": "已经确认是人，并且身体主要在水里或正在入水。人在水里只判 swimming。"
+  },
+  "classes_to_find": [
+    "fishing",
+    "swimming"
+  ],
+  "yolo_classes": [
+    "person"
+  ],
+  "yolo_conf": 0.01,
+  "parser": "允许 ID: [n]；允许同一行 Type 与 Description",
+  "gold_still": "../gold_30m_human.json",
+  "baseline_runs": {
+    "still": {
+      "run_id": "run_bd6142360ea14080",
+      "source": "file",
+      "image": "data/test_img/30m-human.jpg",
+      "layout": "full_frame",
+      "score": "3/4",
+      "boxes": [
+        {
+          "id": 1,
+          "pred": "fishing",
+          "gold": "fishing",
+          "ok": true,
+          "description": "人在水边蹲着"
+        },
+        {
+          "id": 2,
+          "pred": "false_detect",
+          "gold": "false_detect",
+          "ok": true,
+          "description": "红框是空框"
+        },
+        {
+          "id": 3,
+          "pred": "false_detect",
+          "gold": "false_detect",
+          "ok": true,
+          "description": "红框是空框"
+        },
+        {
+          "id": 4,
+          "pred": "false_detect",
+          "gold": "person_ok",
+          "ok": false,
+          "description": "红框是空框",
+          "note": "本版 prompt 没有 person_ok 档，岸上安全的人会进误报，冻结时接受"
+        }
+      ],
+      "confirmed": [
+        "钓鱼人"
+      ]
+    },
+    "rtmp": {
+      "run_id": "run_53571d3fe15a4f55",
+      "source": "rtmp",
+      "frames": "data/runtime/frames/run_907ca56721a54280/rtmp_0000000{1,2,3}.jpg",
+      "layout": "full_frame",
+      "boxes": [
+        {
+          "frame": 1,
+          "pred": "swimming",
+          "description": "人在水中，身体大部分浸在水中"
+        },
+        {
+          "frame": 2,
+          "pred": null,
+          "note": "YOLO 无人"
+        },
+        {
+          "frame": 3,
+          "pred": null,
+          "note": "YOLO 无人"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UVA Vision Workbench</title>
+  <style>
+    :root { --bg:#101418; --card:#1b222b; --text:#e8eef6; --muted:#8b98a8; --line:#2c3642; --ok:#3d9a6a; --bad:#c45c5c; --warn:#c9a227; --accent:#4d8fd6; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"Segoe UI","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); }
+    header {
+      position: sticky; top: 0; z-index: 100;
+      padding:14px 20px; border-bottom:1px solid var(--line);
+      display:flex; flex-wrap:wrap; gap:12px; align-items:baseline;
+      background:var(--bg);
+    }
+    header h1 { margin:0; font-size:17px; }
+    header p { margin:0; color:var(--muted); font-size:12px; flex:1; }
+    nav { display:flex; gap:8px; }
+    nav button { background:var(--card); color:inherit; border:1px solid var(--line); border-radius:8px; padding:6px 12px; cursor:pointer; font:inherit; }
+    nav button.active { border-color:var(--accent); }
+    main { padding:0; }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    #panel-runs.active {
+      height: calc(100vh - var(--header-h, 72px));
+      max-height: calc(100vh - var(--header-h, 72px));
+      overflow: hidden;
+    }
+    .panel-pad { padding:16px 20px 40px; max-width:1200px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+    .hop { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:14px; }
+    .hop:last-child { border-bottom:none; }
+    .ok { color:var(--ok); }
+    .bad { color:var(--bad); }
+    label { display:block; margin:10px 0 4px; font-size:13px; color:var(--muted); }
+    input[type="text"], input[type="number"], select, textarea { width:100%; max-width:420px; padding:8px; border-radius:6px; border:1px solid var(--line); background:#0d1218; color:inherit; font:inherit; }
+    textarea { max-width:100%; min-height:120px; font-family:ui-monospace,Consolas,monospace; font-size:12px; }
+    .config-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px 20px; }
+    .config-grid .wide { grid-column:1 / -1; max-width:100%; }
+    .roi-editor-wrap { position:relative; display:inline-block; max-width:min(960px,100%); margin-top:8px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#000; }
+    .roi-editor-wrap img { display:block; max-width:100%; height:auto; vertical-align:top; user-select:none; -webkit-user-drag:none; }
+    .roi-editor-wrap canvas { position:absolute; left:0; top:0; width:100%; height:100%; cursor:crosshair; touch-action:none; }
+    .roi-editor-toolbar { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin:8px 0; font-size:13px; }
+    .roi-editor-toolbar code { font-size:12px; color:var(--muted); }
+    h4.cfg-section { margin:18px 0 6px; font-size:14px; color:var(--accent); font-weight:600; }
+    input[type="checkbox"] { transform:scale(1.1); margin-right:8px; }
+    .row { display:flex; flex-wrap:wrap; gap:16px 24px; align-items:center; }
+    button.primary { background:#243044; border:1px solid var(--accent); color:inherit; border-radius:8px; padding:8px 14px; cursor:pointer; font:inherit; margin-top:12px; }
+    button.danger { background:transparent; border:1px solid var(--bad); color:#f0b0b0; border-radius:8px; padding:8px 14px; cursor:pointer; font:inherit; margin-top:8px; }
+    .muted { color:var(--muted); font-size:12px; }
+    pre { background:#0d1218; border:1px solid var(--line); border-radius:8px; padding:10px; overflow:auto; font-size:12px; }
+    .runs-layout {
+      display:grid; grid-template-columns:280px 1fr;
+      height:100%; overflow:hidden; align-items:stretch;
+    }
+    .runs-layout aside {
+      border-right:1px solid var(--line); padding:12px;
+      min-height:0; overflow-y:auto; overscroll-behavior:contain;
+    }
+    .runs-layout > section {
+      padding:16px 20px 48px;
+      min-height:0; overflow-y:auto; overscroll-behavior:contain;
+    }
+    .date-label { margin:12px 4px 6px; color:var(--muted); font-size:12px; }
+    .run { display:block; width:100%; text-align:left; padding:10px 12px; margin-bottom:8px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:inherit; cursor:pointer; font:inherit; }
+    .run.active { outline:1px solid var(--accent); }
+    .run .title { font-size:14px; }
+    .run-head { display:flex; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+    .run-head h2 { margin:0; font-size:18px; }
+    .frame-filters { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+    .frame-filters .filter-label { font-size:12px; color:var(--muted); margin-right:4px; }
+    .frame-filter-btn { background:var(--card); border:1px solid var(--line); color:inherit; border-radius:999px; padding:5px 12px; cursor:pointer; font:inherit; font-size:12px; }
+    .frame-filter-btn.active { border-color:var(--accent); background:#243044; }
+    .frame-filter-btn .n { color:var(--muted); margin-left:4px; }
+    .jobs-filter-empty { padding:16px; text-align:center; color:var(--muted); font-size:13px; }
+    .chip { display:inline-block; padding:2px 8px; border-radius:999px; background:#243044; font-size:12px; white-space:nowrap; }
+    .chip.warn { background:#3a3218; color:#e6c56a; }
+    .chip.bad { background:#3a2020; color:#e08a8a; }
+    .chip.ok { background:#1c3328; color:#7dcca3; }
+    .chip.muted { background:#1e2430; color:#8b98a8; }
+    .jobs-db-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:var(--card); }
+    table.jobs-db { width:100%; border-collapse:collapse; font-size:13px; }
+    table.jobs-db th { text-align:left; color:#c5d0dc; font-size:12px; font-weight:600; padding:10px 10px; border-bottom:1px solid var(--line); background:#1a2030; white-space:nowrap; }
+    table.jobs-db td { padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+    table.jobs-db tr.job-row:last-child td { border-bottom:none; }
+    table.jobs-db tr.job-row:hover td { background:rgba(255,255,255,.02); }
+    table.jobs-db .col-thumb { width:1%; padding:6px 8px; }
+    table.jobs-db .col-frame { min-width:140px; max-width:220px; }
+    table.jobs-db .col-frame .frame-title { font-weight:600; font-size:13px; word-break:break-all; }
+    table.jobs-db .col-boxes { min-width:200px; max-width:420px; vertical-align:top; }
+    .frame { position:relative; background:#000; border-radius:6px; overflow:hidden; }
+    .frame img, .frame svg { display:block; width:100%; height:auto; }
+    .frame svg { position:absolute; inset:0; pointer-events:none; }
+    .frame.thumb { width:96px; flex-shrink:0; }
+    .frame.thumb img { max-height:64px; object-fit:contain; }
+    .frame.preview { cursor:zoom-in; }
+    .zoom-hint { position:absolute; right:4px; bottom:4px; padding:1px 6px; border-radius:999px; background:rgba(0,0,0,.62); font-size:10px; line-height:1.3; }
+    table.boxes { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+    table.boxes th { text-align:left; color:#c5d0dc; font-size:11px; padding:4px 6px; border-bottom:1px solid var(--line); }
+    table.boxes td { padding:4px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+    table.boxes tr.flipped td { background:#2a2218; }
+    .num { font-weight:700; }
+    details.job-more, details.raw { font-size:12px; }
+    details.job-more summary, details.raw summary { cursor:pointer; color:var(--muted); }
+    details.job-more[open] summary, details.raw[open] summary { margin-bottom:6px; }
+    details.raw pre { margin:0; max-height:200px; overflow:auto; font-size:11px; }
+    details.push-log summary { cursor:pointer; list-style:none; }
+    details.push-log summary::-webkit-details-marker { display:none; }
+    .push-log-body { margin-top:6px; padding:8px; border:1px solid var(--line); border-radius:8px; background:#121820; font-size:12px; }
+    .push-log-body pre { margin:6px 0 0; max-height:min(70vh, 520px); overflow:auto; font-size:11px; white-space:pre-wrap; word-break:break-all; }
+    .push-log-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+    .push-log-toolbar button { background:#243044; border:1px solid var(--line); color:inherit; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px; }
+    .push-log-attempt { margin-top:8px; padding-top:6px; border-top:1px dashed var(--line); }
+    .lightbox { position:fixed; inset:0; z-index:80; display:flex; flex-direction:column; background:rgba(8,10,12,.92); }
+    .lightbox[hidden] { display:none; }
+    .lightbox-bar { padding:10px 16px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .lightbox-bar button { background:#243044; border:1px solid var(--line); color:inherit; border-radius:8px; padding:6px 12px; cursor:pointer; }
+    .lightbox-stage { flex:1; overflow:auto; }
+    .lightbox-frame { position:relative; margin:16px auto; width:max-content; background:#000; }
+    .lightbox-frame img, .lightbox-frame svg { width:var(--view-w, 100%); max-width:none; height:auto; display:block; }
+    .lightbox-frame svg { position:absolute; inset:0; }
+    .preview-dual { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+    .preview-dual h4 { margin:0 0 8px; font-size:13px; color:var(--muted); }
+    @media (max-width:900px) { .runs-layout, .preview-dual { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>UVA Vision Workbench</h1>
+    <p>本机调参 / 链路状态 / 运行记录。点击左侧任务在本页看图与复核结果，不必看 JSON。</p>
+    <nav>
+      <button type="button" data-tab="status" class="active">链路</button>
+      <button type="button" data-tab="config">配置</button>
+      <button type="button" data-tab="runs">运行</button>
+    </nav>
+  </header>
+  <main>
+    <section id="panel-status" class="panel active panel-pad">
+      <div class="card">
+        <div id="hops"></div>
+        <p class="muted" style="margin-top:12px">直连模式不必 ECS 全绿，见 <code>docs/rtmp_topology.md</code>。</p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-size:15px">收流</h3>
+        <label>RTMP 模式</label>
+        <select id="rtmp_mode" style="max-width:420px;padding:8px;border-radius:6px;background:#0d1218;color:inherit;border:1px solid var(--line)">
+          <option value="direct_local">直连（本机 MTX，外部推流）</option>
+          <option value="edge_relay">ECS 中转拉流</option>
+          <option value="remote_pull">自定义拉流 URL（萤石/第三方）</option>
+          <option value="simulate">本机 mp4 模拟 RTMP（整段时长）</option>
+          <option value="file">成片直抽帧（推荐测检测）</option>
+          <option value="image_folder">文件夹图片（批量重跑识别）</option>
+        </select>
+        <label id="rtmp_custom_pull_label" style="display:none">自定义拉流 URL（完整 rtmp://…，含 query）</label>
+        <input type="text" id="rtmp_custom_pull_url" style="display:none" placeholder="rtmp://rtmp10open.ys7.com:1935/v3/openlive/…" />
+        <label>run_id（可空，自动新建）</label>
+        <input type="text" id="ingest_run_id" placeholder="run_..." />
+        <label>模拟/成片视频路径（simulate / file）</label>
+        <input type="text" id="simulate_video" placeholder="data\test_video\sample.mp4" />
+        <label id="image_folder_path_label" style="display:none">图片文件夹（image_folder，会递归子目录）</label>
+        <input type="text" id="image_folder_path" style="display:none" placeholder="data\runtime\frames\run_xxx" />
+        <div class="row">
+          <button type="button" class="primary" id="ingestStart">开始收流</button>
+          <button type="button" id="ingestStop">停止</button>
+          <button type="button" id="newRun">新建 run_id</button>
+        </div>
+        <p class="muted" id="ingestStatus">收流未启动</p>
+        <p class="muted" style="margin-top:4px;font-size:12px">开始收流时会自动启动 Worker，抽帧入队与 GPU 识别并行；真 RTMP 不断流时请保持 Worker 常驻（勿勾选「跑完队列后退出」）。</p>
+        <p class="muted" id="queueWorkerHint" style="color:#e6c56a;margin-top:8px"></p>
+        <label>4K/成片入队（服务器本地路径，uva/data 下）</label>
+        <input type="text" id="file_ingest_path" />
+        <button type="button" class="primary" id="fileIngest">文件入队</button>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-size:15px">实时预览（最新一帧）</h3>
+        <div class="preview-dual">
+          <div><h4>原图</h4><div class="frame" id="prevRaw"></div></div>
+          <div><h4>YOLO 框</h4><div class="frame" id="prevBox"></div></div>
+        </div>
+        <p class="muted" id="prevMeta"></p>
+      </div>
+    </section>
+    <section id="panel-config" class="panel panel-pad">
+      <div class="card">
+        <div class="row">
+          <label><input type="checkbox" id="gpu_enabled" /> 启用 GPU</label>
+          <label><input type="checkbox" id="vlm_enabled" /> 千问复核（需 GPU）</label>
+          <label><input type="checkbox" id="yolo_enabled" checked /> YOLO 初筛</label>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="ims_enabled" /> 推送 IMS</label>
+          <label><input type="checkbox" id="feiliu_enabled" /> 推送飞流</label>
+        </div>
+        <label>飞流模式</label>
+        <select id="feiliu_mode" style="max-width:420px;padding:8px;border-radius:6px;background:#0d1218;color:inherit;border:1px solid var(--line)">
+          <option value="record_only">record_only（只写本地 JSON，不 POST 飞流）</option>
+          <option value="live">live（真 POST 飞流 HTTP，与 RTMP 收流无关）</option>
+          <option value="off">off</option>
+        </select>
+        <p class="muted" id="feiliuModeWarn" hidden style="color:#e6c56a;margin:4px 0 0;font-size:12px">已勾选「推送飞流」但模式为 record_only：界面会显示「演练落盘」，不会打到飞流平台。真推送请选 live 并保存配置。</p>
+        <label>RTMP 抽帧间隔（秒）</label>
+        <input type="number" id="rtmp_interval" step="0.5" min="0.5" />
+        <label>千问同位置冷却（秒）</label>
+        <input type="number" id="vlm_person_cooldown_sec" step="0.5" min="0" />
+        <p class="muted">同一画面格（约 160px）内，该时间内不重复送千问。无人机 RTMP 建议约 2，与抽帧间隔接近；改后需重启 Worker。</p>
+        <h4 class="cfg-section">冻词 / Prompt</h4>
+        <div class="row">
+          <label style="margin:0">冻词包</label>
+          <select id="frozen_prompt_id" style="max-width:320px">
+            <option value="">（自定义，不覆盖 prompt）</option>
+          </select>
+          <button type="button" id="loadFrozen">载入冻词到表单</button>
+          <button type="button" id="saveFrozen">保存当前为冻词</button>
+        </div>
+        <p class="muted" id="frozenHint"></p>
+        <h4 class="cfg-section">YOLO 初筛</h4>
+        <p class="muted" id="yoloWeightsHint">
+          World 与 YOLOv8s 共用同一套 <code>YOLO_CLASSES</code>：填英文类名（如 person, boat），不要填 COCO 数字 ID。改权重后需重启 Worker。
+        </p>
+        <div class="config-grid">
+          <div class="wide">
+            <label>检测权重</label>
+            <select id="yolo_weights_preset"></select>
+          </div>
+          <div class="wide">
+            <label>YOLO_CLASSES（逗号分隔类名）</label>
+            <input type="text" id="yolo_classes" placeholder="person, boat" />
+          </div>
+          <div>
+            <label>全局置信度 YOLO_CONF_THRESHOLD</label>
+            <input type="number" id="yolo_conf" step="0.01" min="0" max="1" />
+          </div>
+          <div class="wide">
+            <label>按类阈值 YOLO_CLASS_CONF_THRESHOLD（JSON）</label>
+            <input type="text" id="yolo_class_conf" placeholder='{"person":0.01}' />
+          </div>
+          <div class="wide">
+            <label>权重路径 YOLO_WEIGHTS_PATH（高级：可手改）</label>
+            <input type="text" id="yolo_weights_path" />
+          </div>
+        </div>
+        <h4 class="cfg-section">检测 ROI（仅 YOLO，去掉 OSD 外圈）</h4>
+        <p class="muted">拖矩形后勾选「启用」并点下方<strong>保存配置</strong>；写入 <code>DETECT_ROI_BY_SOURCE</code>（file/rtmp 同步）。YOLO 只在框内推理；运行页原图会叠绿色 detect ROI。文件夹批量识别走 <code>file</code> 源。</p>
+        <div class="roi-editor-toolbar">
+          <label><input type="checkbox" id="roi_rtmp_enabled" /> 启用 RTMP 检测 ROI</label>
+          <button type="button" id="roiReloadSample">换一张标杆图</button>
+          <button type="button" id="roiClear">清除框</button>
+          <code id="roiNormLabel">未设置</code>
+        </div>
+        <div class="roi-editor-wrap" id="roiEditorWrap">
+          <img id="roiEditorImg" alt="ROI 标杆帧" draggable="false" />
+          <canvas id="roiEditorCanvas"></canvas>
+        </div>
+        <h4 class="cfg-section">切片 / NMS</h4>
+        <div class="config-grid">
+          <div>
+            <label>SLICER_SIZE</label>
+            <input type="number" id="slicer_size" step="32" min="320" />
+          </div>
+          <div>
+            <label>SLICER_OVERLAP_RATIO</label>
+            <input type="number" id="slicer_overlap" step="0.05" min="0" max="0.9" />
+          </div>
+          <div>
+            <label>NMS IoU</label>
+            <input type="number" id="nms_iou" step="0.05" min="0" max="1" />
+          </div>
+          <div>
+            <label>NMS IoF</label>
+            <input type="number" id="nms_iof" step="0.05" min="0" max="1" />
+          </div>
+        </div>
+        <h4 class="cfg-section">千问复核</h4>
+        <div class="config-grid">
+          <div class="wide">
+            <label>CLASSES_TO_FIND（逗号分隔）</label>
+            <input type="text" id="classes_to_find" placeholder="fishing,swimming" />
+          </div>
+          <div class="wide">
+            <label>VLM_PROMPT_TEMPLATE</label>
+            <textarea id="vlm_prompt" spellcheck="false"></textarea>
+          </div>
+          <div>
+            <label>VLM_MAX_NEW_TOKENS</label>
+            <input type="number" id="vlm_max_tokens" step="64" min="64" />
+          </div>
+          <div>
+            <label>成片 layout（file）</label>
+            <select id="vlm_layout_file">
+              <option value="full_frame">full_frame</option>
+              <option value="per_box">per_box</option>
+            </select>
+          </div>
+          <div>
+            <label>RTMP layout</label>
+            <select id="vlm_layout_rtmp">
+              <option value="full_frame">full_frame</option>
+              <option value="per_box">per_box</option>
+            </select>
+          </div>
+          <div class="wide">
+            <label>千问 VL 权重（GPU 复核 · transformers 本地）</label>
+            <select id="qwen_vl_preset"></select>
+          </div>
+          <div class="wide">
+            <label>QWEN_DIR_PATH（高级：可手改路径）</label>
+            <input type="text" id="qwen_dir_path" />
+            <p class="muted" id="qwenVlInvokeHint"></p>
+          </div>
+        </div>
+        <h4 class="cfg-section">飞流映射</h4>
+        <div class="config-grid">
+          <div>
+            <label>机库 NestId</label>
+            <input type="text" id="feiliu_nest_id" />
+          </div>
+          <div>
+            <label>飞流 URL（live 用）</label>
+            <input type="text" id="feiliu_url" />
+          </div>
+          <div class="wide">
+            <label>alert_type → algoId（JSON，如 钓鱼人/游泳人）</label>
+            <input type="text" id="alert_algo_map" />
+          </div>
+        </div>
+        <p class="muted" id="effectiveNote"></p>
+        <button type="button" class="primary" id="saveConfig">保存配置</button>
+        <hr style="border:none;border-top:1px solid var(--line);margin:16px 0" />
+        <h3 style="margin:0 0 8px;font-size:15px">GPU Worker</h3>
+        <label><input type="checkbox" id="worker_until_empty" /> 跑完当前队列后自动退出（本地试跑可勾选）</label>
+        <p class="muted" id="workerStatus">Worker 未由本页启动</p>
+        <div class="row">
+          <button type="button" class="primary" id="workerRestart">重启 Worker（应用配置）</button>
+          <button type="button" id="workerStart">启动</button>
+          <button type="button" id="workerStop">停止</button>
+        </div>
+        <p class="muted">仅管理从本工作台启动的进程；若在终端里另开了 worker，请先关掉避免抢同一队列。日志：<code id="workerLogHint"></code></p>
+        <pre id="workerLogTail" class="muted" style="max-height:160px;font-size:11px;margin-top:8px"></pre>
+        <hr style="border:none;border-top:1px solid var(--line);margin:16px 0" />
+        <h3 style="margin:0 0 8px;font-size:15px">测试数据</h3>
+        <p class="muted" style="margin:0 0 10px">清空本机队列、识别结果、帧图/证据图与推送记录；不删配置、测试视频与模型。会先停止收流与 Worker。</p>
+        <button type="button" class="danger" id="clearTestData">一键清空本地测试数据</button>
+        <p class="muted" id="clearTestDataMsg" style="margin-top:8px"></p>
+      </div>
+      <div class="card"><pre id="configJson"></pre></div>
+    </section>
+    <section id="panel-runs" class="panel">
+      <div class="runs-layout">
+        <aside><div id="runsList"></div></aside>
+        <section>
+          <div id="runEmpty" class="muted">从左侧选一次运行（run），这里会以表格列出每一帧；点击缩略图可放大查看。</div>
+          <div id="runDetail" hidden>
+            <div class="run-head">
+              <div>
+                <h2 id="runTitle"></h2>
+                <p class="muted" id="runMeta"></p>
+              </div>
+              <div>
+                <div class="muted" id="runId"></div>
+                <button type="button" class="primary" id="exportJson" style="margin-top:8px">导出 JSON</button>
+                <button type="button" id="exportCsv" style="margin-top:8px;margin-left:8px">导出 CSV</button>
+              </div>
+            </div>
+            <div id="runFrameFilters" class="frame-filters" hidden>
+              <span class="filter-label">帧状态</span>
+            </div>
+            <div id="jobs"></div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <div id="lightbox" class="lightbox" hidden>
+    <div class="lightbox-bar">
+      <strong id="lightboxTitle">原图</strong>
+      <span class="muted">Esc 关闭</span>
+      <button type="button" id="lightboxClose">关闭</button>
+    </div>
+    <div class="lightbox-stage" id="lightboxStage">
+      <div class="lightbox-frame" id="lightboxFrame">
+        <img id="lightboxImg" alt="" />
+        <svg id="lightboxSvg"></svg>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tabs = document.querySelectorAll("nav button");
+    tabs.forEach(btn => btn.addEventListener("click", () => {
+      tabs.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+      document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
+    }));
+
+    function el(tag, attrs, children) {
+      const node = document.createElement(tag);
+      Object.entries(attrs || {}).forEach(([key, value]) => {
+        if (value == null || value === false) return;
+        if (key === "className") node.className = value;
+        else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2).toLowerCase(), value);
+        else if (key === "text") node.textContent = value;
+        else node.setAttribute(key, value);
+      });
+      (children || []).forEach(child => {
+        if (child == null) return;
+        node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+      });
+      return node;
+    }
+
+    function fileUrl(path) {
+      return path ? "/api/file?path=" + encodeURIComponent(path) : "";
+    }
+
+    let selectedRunId = null;
+    let currentRunJobs = [];
+    let currentFrameFilter = "all";
+
+    const FRAME_FILTER_DEFS = [
+      { id: "all", label: "全部" },
+      { id: "queue", label: "未检测（排队中）" },
+      { id: "no_hit", label: "未检出结果" },
+      { id: "no_alert", label: "复核未预警" },
+      { id: "alert", label: "已预警" },
+    ];
+
+    function frameStatusCategory(job) {
+      const st = job.status || "";
+      if (st === "queued" || st === "running") return "queue";
+      const result = (job.raw && job.raw.result) || {};
+      const alerts = result.confirmed_alerts || [];
+      if (alerts.length > 0 || String(job.outcome || "").startsWith("预警")) return "alert";
+      const boxes = job.boxes || [];
+      const hasPerson = boxes.length > 0 || (result.detections || []).length > 0;
+      if (!hasPerson) return "no_hit";
+      return "no_alert";
+    }
+
+    function frameStatusLabel(cat) {
+      const def = FRAME_FILTER_DEFS.find(d => d.id === cat);
+      return def ? def.label : cat;
+    }
+
+    function countJobsByFrameCategory(jobs) {
+      const counts = { all: jobs.length, queue: 0, no_hit: 0, no_alert: 0, alert: 0 };
+      (jobs || []).forEach(job => {
+        const c = frameStatusCategory(job);
+        if (counts[c] !== undefined) counts[c] += 1;
+      });
+      return counts;
+    }
+
+    function renderFrameFilterBar(jobs) {
+      const bar = document.getElementById("runFrameFilters");
+      bar.replaceChildren(el("span", { className: "filter-label", text: "帧状态" }));
+      const counts = countJobsByFrameCategory(jobs);
+      FRAME_FILTER_DEFS.forEach(def => {
+        const btn = el("button", {
+          type: "button",
+          className: "frame-filter-btn" + (currentFrameFilter === def.id ? " active" : ""),
+          onclick: () => {
+            currentFrameFilter = def.id;
+            renderRunJobsTable();
+          },
+        });
+        btn.appendChild(document.createTextNode(def.label));
+        btn.appendChild(el("span", { className: "n", text: String(counts[def.id] ?? 0) }));
+        bar.appendChild(btn);
+      });
+      bar.hidden = false;
+    }
+
+    function jobsForFrameFilter(jobs) {
+      if (currentFrameFilter === "all") return jobs;
+      return (jobs || []).filter(job => frameStatusCategory(job) === currentFrameFilter);
+    }
+
+    function renderRunJobsTable() {
+      const jobsEl = document.getElementById("jobs");
+      jobsEl.replaceChildren();
+      renderFrameFilterBar(currentRunJobs);
+      const filtered = jobsForFrameFilter(currentRunJobs);
+      if (!filtered.length) {
+        jobsEl.appendChild(el("div", {
+          className: "jobs-filter-empty",
+          text: currentFrameFilter === "all"
+            ? "本次运行尚无帧记录。"
+            : `没有「${frameStatusLabel(currentFrameFilter)}」的帧，可点「全部」查看。`,
+        }));
+        return;
+      }
+      jobsEl.appendChild(renderJobsList(filtered));
+    }
+
+    async function loadHops() {
+      const data = await fetch("/api/hops").then(r => r.json());
+      const root = document.getElementById("hops");
+      root.replaceChildren();
+      (data.hops || []).forEach(h => {
+        const row = document.createElement("div");
+        row.className = "hop";
+        row.innerHTML = `<span>${h.id}</span><span class="${h.ok ? "ok" : "bad"}">${h.ok ? "OK" : "FAIL"} — ${h.detail || ""}</span>`;
+        root.appendChild(row);
+      });
+    }
+
+    function csvToList(s) {
+      return String(s || "").split(/[,，\n]/).map(x => x.trim()).filter(Boolean);
+    }
+    function listToCsv(arr) {
+      return (arr || []).join(", ");
+    }
+    function parseJsonObject(raw, fieldName) {
+      const t = String(raw || "").trim();
+      if (!t) return undefined;
+      try {
+        const o = JSON.parse(t);
+        if (o && typeof o === "object" && !Array.isArray(o)) return o;
+      } catch (_) {}
+      throw new Error(fieldName + " 必须是合法 JSON 对象");
+    }
+
+    let yoloWeightPresets = [];
+    let qwenVlPresets = [];
+
+    function normPath(p) {
+      return String(p || "").trim().replace(/\\/g, "/").toLowerCase();
+    }
+
+    function pathBasename(p) {
+      const s = normPath(p);
+      const i = s.lastIndexOf("/");
+      return i >= 0 ? s.slice(i + 1) : s;
+    }
+
+    function pathsMatch(a, b) {
+      if (!a || !b) return false;
+      const na = normPath(a);
+      const nb = normPath(b);
+      if (na === nb) return true;
+      const ba = pathBasename(na);
+      const bb = pathBasename(nb);
+      if (ba && ba === bb) {
+        if (ba === "yolov8s.pt" || ba === "yolov8s-world.pt") return true;
+        if (ba.startsWith("qwen3-vl-")) return true;
+      }
+      return false;
+    }
+
+    function fillYoloPresetSelect() {
+      const sel = document.getElementById("yolo_weights_preset");
+      sel.replaceChildren();
+      yoloWeightPresets.forEach(p => {
+        sel.appendChild(el("option", { value: p.id, text: p.label }));
+      });
+      sel.appendChild(el("option", { value: "_custom", text: "自定义路径（下方输入框）" }));
+    }
+
+    function presetById(id) {
+      return yoloWeightPresets.find(p => p.id === id);
+    }
+
+    function syncYoloPresetFromPath() {
+      const path = document.getElementById("yolo_weights_path").value;
+      const sel = document.getElementById("yolo_weights_preset");
+      let matched = "_custom";
+      for (const p of yoloWeightPresets) {
+        if (pathsMatch(path, p.path)) {
+          matched = p.id;
+          break;
+        }
+      }
+      if (sel.querySelector('option[value="' + matched + '"]')) {
+        sel.value = matched;
+      } else {
+        sel.value = "_custom";
+      }
+    }
+
+    function applyYoloPresetSelection() {
+      const sel = document.getElementById("yolo_weights_preset");
+      const id = sel.value;
+      if (id === "_custom") return;
+      const preset = presetById(id);
+      if (preset) document.getElementById("yolo_weights_path").value = preset.path;
+    }
+
+    function resolveYoloWeightsPath() {
+      const sel = document.getElementById("yolo_weights_preset");
+      if (sel.value !== "_custom") {
+        const preset = presetById(sel.value);
+        if (preset && preset.path) return preset.path;
+      }
+      return document.getElementById("yolo_weights_path").value.trim();
+    }
+
+    async function loadYoloWeightPresets() {
+      yoloWeightPresets = [];
+      try {
+        const data = await fetch("/api/pra/yolo-weight-presets").then(r => r.json());
+        yoloWeightPresets = data.items || [];
+      } catch (_) {}
+      if (!yoloWeightPresets.length) {
+        try {
+          const cfg = await fetch("/api/pra/config").then(r => r.json());
+          yoloWeightPresets = cfg.yolo_weight_presets || [];
+        } catch (_) {}
+      }
+      fillYoloPresetSelect();
+    }
+
+    function fillQwenVlPresetSelect() {
+      const sel = document.getElementById("qwen_vl_preset");
+      sel.replaceChildren();
+      qwenVlPresets.forEach(p => {
+        sel.appendChild(el("option", { value: p.id, text: p.label }));
+      });
+      sel.appendChild(el("option", { value: "_custom", text: "自定义路径（下方输入框）" }));
+    }
+
+    function qwenVlPresetById(id) {
+      return qwenVlPresets.find(p => p.id === id);
+    }
+
+    function syncQwenVlPresetFromPath() {
+      const path = document.getElementById("qwen_dir_path").value;
+      const sel = document.getElementById("qwen_vl_preset");
+      let matched = "_custom";
+      for (const p of qwenVlPresets) {
+        if (pathsMatch(path, p.path)) {
+          matched = p.id;
+          break;
+        }
+      }
+      if (sel.querySelector('option[value="' + matched + '"]')) {
+        sel.value = matched;
+      } else {
+        sel.value = "_custom";
+      }
+      refreshQwenVlInvokeHint();
+    }
+
+    function applyQwenVlPresetSelection() {
+      const sel = document.getElementById("qwen_vl_preset");
+      const id = sel.value;
+      if (id === "_custom") {
+        refreshQwenVlInvokeHint();
+        return;
+      }
+      const preset = qwenVlPresetById(id);
+      if (preset && preset.path) {
+        document.getElementById("qwen_dir_path").value = preset.path;
+      }
+      refreshQwenVlInvokeHint();
+    }
+
+    function resolveQwenDirPath() {
+      const sel = document.getElementById("qwen_vl_preset");
+      if (sel.value !== "_custom") {
+        const preset = qwenVlPresetById(sel.value);
+        if (preset && preset.path) return preset.path;
+      }
+      return document.getElementById("qwen_dir_path").value.trim();
+    }
+
+    function refreshQwenVlInvokeHint() {
+      const hint = document.getElementById("qwenVlInvokeHint");
+      const sel = document.getElementById("qwen_vl_preset");
+      const path = resolveQwenDirPath();
+      let extra = "";
+      if (sel.value !== "_custom") {
+        const preset = qwenVlPresetById(sel.value);
+        if (preset) extra = " · 调用：Worker 内 transformers 加载本地目录";
+      } else {
+        extra = " · 调用：Worker 内 transformers 加载下方路径";
+      }
+      hint.textContent = path ? ("当前路径：" + path + extra) : "请选择 VL 权重或填写路径";
+    }
+
+    async function loadModelPresetsFromConfig(cfg) {
+      if (cfg) {
+        if (!yoloWeightPresets.length) yoloWeightPresets = cfg.yolo_weight_presets || [];
+        qwenVlPresets = cfg.qwen_vl_presets || [];
+      }
+      fillYoloPresetSelect();
+      fillQwenVlPresetSelect();
+    }
+
+    let roiNorm = null;
+    let roiDrag = null;
+    let roiBySourceFile = null;
+
+    function formatRoiNorm(n) {
+      if (!n || n.length !== 4) return "未设置";
+      return n.map(v => Number(v).toFixed(4)).join(", ");
+    }
+
+    function updateRoiLabel() {
+      document.getElementById("roiNormLabel").textContent = formatRoiNorm(roiNorm);
+    }
+
+    function redrawRoiCanvas() {
+      const img = document.getElementById("roiEditorImg");
+      const canvas = document.getElementById("roiEditorCanvas");
+      if (!img || !canvas || !img.naturalWidth) return;
+      const r = img.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.floor(r.width));
+      canvas.height = Math.max(1, Math.floor(r.height));
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!roiNorm || roiNorm.length !== 4) return;
+      const x1 = roiNorm[0] * canvas.width;
+      const y1 = roiNorm[1] * canvas.height;
+      const x2 = roiNorm[2] * canvas.width;
+      const y2 = roiNorm[3] * canvas.height;
+      ctx.fillStyle = "rgba(77, 143, 214, 0.14)";
+      ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+      ctx.strokeStyle = "rgba(77, 223, 255, 0.95)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+    }
+
+    function clientToNorm(clientX, clientY) {
+      const img = document.getElementById("roiEditorImg");
+      const r = img.getBoundingClientRect();
+      const x = (clientX - r.left) / r.width;
+      const y = (clientY - r.top) / r.height;
+      return [Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))];
+    }
+
+    function normFromDrag(a, b) {
+      const x1 = Math.min(a[0], b[0]);
+      const y1 = Math.min(a[1], b[1]);
+      const x2 = Math.max(a[0], b[0]);
+      const y2 = Math.max(a[1], b[1]);
+      if (x2 - x1 < 0.01 || y2 - y1 < 0.01) return null;
+      return [x1, y1, x2, y2];
+    }
+
+    async function loadRoiSampleImage() {
+      const img = document.getElementById("roiEditorImg");
+      const meta = await fetch("/api/pra/roi/sample").then(r => {
+        if (!r.ok) throw new Error("暂无标杆图");
+        return r.json();
+      });
+      img.onload = () => redrawRoiCanvas();
+      img.src = "/api/file?path=" + encodeURIComponent(meta.path);
+      const wrap = document.getElementById("roiEditorWrap");
+      if (wrap) wrap.title = meta.name + " (" + meta.width + "×" + meta.height + ")";
+    }
+
+    function initRoiEditor() {
+      const canvas = document.getElementById("roiEditorCanvas");
+      if (!canvas || canvas.dataset.bound) return;
+      canvas.dataset.bound = "1";
+      const onDown = (e) => {
+        if (!document.getElementById("roi_rtmp_enabled").checked) return;
+        e.preventDefault();
+        const pt = clientToNorm(e.clientX, e.clientY);
+        roiDrag = { start: pt, cur: pt };
+      };
+      const onMove = (e) => {
+        if (!roiDrag) return;
+        e.preventDefault();
+        roiDrag.cur = clientToNorm(e.clientX, e.clientY);
+        roiNorm = normFromDrag(roiDrag.start, roiDrag.cur);
+        updateRoiLabel();
+        redrawRoiCanvas();
+      };
+      const onUp = (e) => {
+        if (!roiDrag) return;
+        roiDrag.cur = clientToNorm(e.clientX, e.clientY);
+        roiNorm = normFromDrag(roiDrag.start, roiDrag.cur);
+        roiDrag = null;
+        if (roiNorm) document.getElementById("roi_rtmp_enabled").checked = true;
+        updateRoiLabel();
+        redrawRoiCanvas();
+      };
+      canvas.addEventListener("mousedown", onDown);
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      window.addEventListener("resize", () => redrawRoiCanvas());
+      document.getElementById("roiReloadSample").addEventListener("click", () => {
+        loadRoiSampleImage().catch(err => alert(err.message || String(err)));
+      });
+      document.getElementById("roiClear").addEventListener("click", () => {
+        roiNorm = null;
+        roiDrag = null;
+        document.getElementById("roi_rtmp_enabled").checked = false;
+        updateRoiLabel();
+        redrawRoiCanvas();
+      });
+      document.getElementById("roi_rtmp_enabled").addEventListener("change", () => {
+        if (!document.getElementById("roi_rtmp_enabled").checked) {
+          roiNorm = null;
+          updateRoiLabel();
+        }
+        redrawRoiCanvas();
+      });
+      loadRoiSampleImage().catch(() => {
+        document.getElementById("roiNormLabel").textContent = "暂无标杆图（可先收流）";
+      });
+    }
+
+    function fillRuntimeForm(rt, defaults) {
+      const d = defaults || {};
+      const pick = (k, fallback) => (rt && rt[k] != null ? rt[k] : d[k]);
+      document.getElementById("yolo_classes").value = listToCsv(pick("YOLO_CLASSES", ["person"]));
+      document.getElementById("yolo_conf").value = pick("YOLO_CONF_THRESHOLD", 0.25);
+      const ycc = pick("YOLO_CLASS_CONF_THRESHOLD", {});
+      document.getElementById("yolo_class_conf").value =
+        ycc && Object.keys(ycc).length ? JSON.stringify(ycc) : "";
+      let yw = pick("YOLO_WEIGHTS_PATH", "");
+      if (yw == null || String(yw).trim() === "") {
+        const world = presetById("yolov8s_world");
+        yw = world ? world.path : "";
+      }
+      document.getElementById("yolo_weights_path").value = String(yw || "");
+      syncYoloPresetFromPath();
+      document.getElementById("slicer_size").value = pick("SLICER_SIZE", 640);
+      document.getElementById("slicer_overlap").value = pick("SLICER_OVERLAP_RATIO", 0.2);
+      document.getElementById("nms_iou").value = pick("GLOBAL_CLASS_AGNOSTIC_NMS_IOU", 0.5);
+      document.getElementById("nms_iof").value = pick("GLOBAL_CLASS_AGNOSTIC_NMS_IOF", 0.42);
+      document.getElementById("classes_to_find").value = listToCsv(pick("CLASSES_TO_FIND", []));
+      document.getElementById("vlm_prompt").value = pick("VLM_PROMPT_TEMPLATE", "") || "";
+      document.getElementById("vlm_max_tokens").value = pick("VLM_MAX_NEW_TOKENS", 1024);
+      const layout = pick("VLM_LAYOUT_BY_SOURCE", {}) || {};
+      document.getElementById("vlm_layout_file").value = layout.file || "full_frame";
+      document.getElementById("vlm_layout_rtmp").value = layout.rtmp || "full_frame";
+      document.getElementById("qwen_dir_path").value = pick("QWEN_DIR_PATH", "") || "";
+      syncQwenVlPresetFromPath();
+      const fid = (rt && rt._frozen_prompt_id) || "";
+      if (fid) document.getElementById("frozen_prompt_id").value = fid;
+      const roiTable = pick("DETECT_ROI_BY_SOURCE", {}) || {};
+      roiBySourceFile = roiTable.file || null;
+      const rtmpRoi = roiTable.rtmp;
+      if (Array.isArray(rtmpRoi) && rtmpRoi.length === 4) {
+        roiNorm = rtmpRoi.map(Number);
+        document.getElementById("roi_rtmp_enabled").checked = true;
+      } else {
+        roiNorm = null;
+        document.getElementById("roi_rtmp_enabled").checked = false;
+      }
+      updateRoiLabel();
+      redrawRoiCanvas();
+    }
+
+    function buildRuntimePatch() {
+      const runtime = {
+        YOLO_CONF_THRESHOLD: Number(document.getElementById("yolo_conf").value),
+        SLICER_SIZE: parseInt(document.getElementById("slicer_size").value, 10),
+        SLICER_OVERLAP_RATIO: Number(document.getElementById("slicer_overlap").value),
+        GLOBAL_CLASS_AGNOSTIC_NMS_IOU: Number(document.getElementById("nms_iou").value),
+        GLOBAL_CLASS_AGNOSTIC_NMS_IOF: Number(document.getElementById("nms_iof").value),
+        VLM_MAX_NEW_TOKENS: parseInt(document.getElementById("vlm_max_tokens").value, 10),
+        VLM_LAYOUT_BY_SOURCE: {
+          file: document.getElementById("vlm_layout_file").value,
+          rtmp: document.getElementById("vlm_layout_rtmp").value,
+        },
+      };
+      const yc = csvToList(document.getElementById("yolo_classes").value);
+      if (yc.length) runtime.YOLO_CLASSES = yc;
+      const ctf = csvToList(document.getElementById("classes_to_find").value);
+      if (ctf.length) runtime.CLASSES_TO_FIND = ctf;
+      const ycc = parseJsonObject(document.getElementById("yolo_class_conf").value, "YOLO_CLASS_CONF_THRESHOLD");
+      if (ycc) runtime.YOLO_CLASS_CONF_THRESHOLD = ycc;
+      const prompt = document.getElementById("vlm_prompt").value;
+      if (prompt.trim()) runtime.VLM_PROMPT_TEMPLATE = prompt;
+      const yw = resolveYoloWeightsPath();
+      if (yw) runtime.YOLO_WEIGHTS_PATH = yw;
+      const qd = resolveQwenDirPath();
+      if (qd) runtime.QWEN_DIR_PATH = qd;
+      const fid = document.getElementById("frozen_prompt_id").value;
+      if (fid) runtime._frozen_prompt_id = fid;
+      const roiBySource = {};
+      if (roiBySourceFile) roiBySource.file = roiBySourceFile;
+      if (document.getElementById("roi_rtmp_enabled").checked && roiNorm && roiNorm.length === 4) {
+        const norm = roiNorm.map(v => Math.round(Number(v) * 10000) / 10000);
+        roiBySource.rtmp = norm;
+        roiBySource.file = norm;
+      } else {
+        roiBySource.rtmp = null;
+        roiBySource.file = null;
+      }
+      runtime.DRAW_DETECT_ROI_ON_EVIDENCE = true;
+      runtime.DETECT_ROI_BY_SOURCE = roiBySource;
+      return runtime;
+    }
+
+    async function loadFrozenOptions() {
+      const data = await fetch("/api/pra/frozen-prompts").then(r => r.json());
+      const sel = document.getElementById("frozen_prompt_id");
+      const keep = sel.value;
+      sel.replaceChildren(el("option", { value: "", text: "（自定义，不覆盖 prompt）" }));
+      (data.items || []).forEach(item => {
+        sel.appendChild(el("option", {
+          value: item.id,
+          text: item.id + (item.purpose ? " — " + String(item.purpose).slice(0, 36) : ""),
+        }));
+      });
+      if (keep) sel.value = keep;
+    }
+
+    document.getElementById("loadFrozen").addEventListener("click", async () => {
+      const fid = document.getElementById("frozen_prompt_id").value;
+      if (!fid) { alert("请先选择冻词包"); return; }
+      const data = await fetch("/api/pra/frozen-prompts/" + encodeURIComponent(fid)).then(r => {
+        if (!r.ok) throw new Error("载入失败");
+        return r.json();
+      });
+      fillRuntimeForm(data.runtime, {});
+      document.getElementById("frozenHint").textContent =
+        "已载入 " + fid + " 到表单（尚未保存）；确认后点「保存配置」并重启 Worker。";
+    });
+
+    async function saveFrozenPrompt(overwrite) {
+      const promptText = document.getElementById("vlm_prompt").value;
+      if (!String(promptText).trim()) {
+        alert("请先填写 VLM_PROMPT_TEMPLATE（千问复核区大文本框）");
+        return;
+      }
+      let runtime;
+      try {
+        runtime = buildRuntimePatch();
+      } catch (e) {
+        alert(e.message || String(e));
+        return;
+      }
+      runtime.VLM_PROMPT_TEMPLATE = promptText;
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const frozen_id = window.prompt(
+        "冻词 id（字母开头，唯一，将写入 uva/data/eval_p1/frozen/）",
+        "pra_v_" + today
+      );
+      if (!frozen_id || !String(frozen_id).trim()) return;
+      const purpose = window.prompt("用途说明（写入冻词元数据）", "工作台保存") || "";
+      const based_on = document.getElementById("frozen_prompt_id").value || null;
+      const res = await fetch("/api/pra/frozen-prompts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          frozen_id: String(frozen_id).trim(),
+          purpose,
+          overwrite: !!overwrite,
+          based_on: based_on || undefined,
+          runtime,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && !overwrite) {
+        if (confirm((data.detail || "冻词 id 已存在") + "\n\n是否覆盖？")) {
+          return saveFrozenPrompt(true);
+        }
+        return;
+      }
+      if (!res.ok) {
+        alert(data.detail || data.message || "保存失败");
+        return;
+      }
+      await loadFrozenOptions();
+      document.getElementById("frozen_prompt_id").value = data.frozen_id;
+      fillRuntimeForm(data.runtime || {}, {});
+      await loadConfig();
+      document.getElementById("frozenHint").textContent =
+        "已保存冻词 " + data.frozen_id + "，并写入 pra_runtime.yaml。" + (data.note || "");
+      alert(data.note || "冻词已保存");
+    }
+
+    document.getElementById("saveFrozen").addEventListener("click", () => saveFrozenPrompt(false));
+
+    async function loadConfig() {
+      const cfg = await fetch("/api/pra/config").then(r => r.json());
+      await loadModelPresetsFromConfig(cfg);
+      document.getElementById("gpu_enabled").checked = !!cfg.device?.gpu_enabled;
+      document.getElementById("vlm_enabled").checked = !!cfg.inference?.vlm_enabled;
+      document.getElementById("yolo_enabled").checked = cfg.inference?.yolo_enabled !== false;
+      document.getElementById("ims_enabled").checked = !!cfg.push?.ims_enabled;
+      document.getElementById("feiliu_enabled").checked = !!cfg.push?.feiliu_enabled;
+      document.getElementById("feiliu_mode").value = cfg.push?.feiliu_mode || "record_only";
+      document.getElementById("rtmp_mode").value = cfg.ingest?.rtmp_mode || "direct_local";
+      document.getElementById("rtmp_interval").value = cfg.ingest?.rtmp_frame_interval_sec ?? 2;
+      document.getElementById("vlm_person_cooldown_sec").value = cfg.ingest?.vlm_person_cooldown_sec ?? 2;
+      document.getElementById("rtmp_custom_pull_url").value = cfg.ingest?.rtmp_custom_pull_url || "";
+      const savedFolder = cfg.ingest?.image_folder_path || "";
+      if (savedFolder) document.getElementById("image_folder_path").value = savedFolder;
+      syncRtmpIngestFields();
+      syncIngestModeHint();
+      document.getElementById("feiliu_nest_id").value = cfg.push?.feiliu_nest_id || "";
+      document.getElementById("feiliu_url").value = cfg.push?.feiliu_url || "";
+      syncFeiliuModeWarn();
+      const algo = cfg.push?.alert_type_to_algo_id || {};
+      document.getElementById("alert_algo_map").value = Object.keys(algo).length ? JSON.stringify(algo) : "";
+      fillRuntimeForm(cfg.runtime || {}, cfg.runtime_defaults || {});
+      document.getElementById("effectiveNote").textContent =
+        "千问是否实际启用：" + (cfg.inference?.effective_use_vlm ? "是" : "否（当前仅 YOLO 或仅浏览历史）") +
+        " · 未写在 runtime 的字段显示为 uva 内核默认（见右侧 JSON 的 runtime_defaults）。";
+      document.getElementById("configJson").textContent = JSON.stringify(cfg, null, 2);
+    }
+
+    function syncFeiliuModeWarn() {
+      const on = document.getElementById("feiliu_enabled").checked;
+      const mode = document.getElementById("feiliu_mode").value;
+      const el = document.getElementById("feiliuModeWarn");
+      el.hidden = !(on && mode === "record_only");
+    }
+    document.getElementById("feiliu_enabled").addEventListener("change", syncFeiliuModeWarn);
+    document.getElementById("feiliu_mode").addEventListener("change", syncFeiliuModeWarn);
+
+    document.getElementById("saveConfig").addEventListener("click", async () => {
+      let runtime;
+      try {
+        runtime = buildRuntimePatch();
+      } catch (e) {
+        alert(e.message || String(e));
+        return;
+      }
+      let alertAlgo;
+      try {
+        alertAlgo = parseJsonObject(document.getElementById("alert_algo_map").value, "alert_type_to_algo_id");
+      } catch (e) {
+        alert(e.message || String(e));
+        return;
+      }
+      if (document.getElementById("feiliu_enabled").checked && document.getElementById("feiliu_mode").value === "record_only") {
+        const goLive = confirm(
+          "当前为 record_only：只会把请求写到本地 JSON（演练落盘），不会 POST 飞流。\n\n点「确定」改为 live 并保存；点「取消」仍按 record_only 保存。"
+        );
+        if (goLive) document.getElementById("feiliu_mode").value = "live";
+      }
+      const patch = {
+        device: {
+          gpu_enabled: document.getElementById("gpu_enabled").checked,
+        },
+        inference: {
+          vlm_enabled: document.getElementById("vlm_enabled").checked,
+          yolo_enabled: document.getElementById("yolo_enabled").checked,
+        },
+        ingest: {
+          rtmp_frame_interval_sec: Number(document.getElementById("rtmp_interval").value),
+          vlm_person_cooldown_sec: Number(document.getElementById("vlm_person_cooldown_sec").value),
+          rtmp_mode: document.getElementById("rtmp_mode").value,
+          rtmp_custom_pull_url: document.getElementById("rtmp_custom_pull_url").value.trim(),
+          image_folder_path: document.getElementById("image_folder_path").value.trim(),
+        },
+        runtime,
+        push: {
+          ims_enabled: document.getElementById("ims_enabled").checked,
+          feiliu_enabled: document.getElementById("feiliu_enabled").checked,
+          feiliu_mode: document.getElementById("feiliu_mode").value,
+          feiliu_nest_id: document.getElementById("feiliu_nest_id").value.trim(),
+          feiliu_url: document.getElementById("feiliu_url").value.trim(),
+          ...(alertAlgo ? { alert_type_to_algo_id: alertAlgo } : {}),
+        },
+      };
+      const res = await fetch("/api/pra/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patch }),
+      }).then(r => r.json());
+      await loadConfig();
+      alert(res.note || "已保存");
+    });
+
+    function workerBody() {
+      return { until_empty: document.getElementById("worker_until_empty").checked };
+    }
+
+    function formatWorkerStatusLine(st) {
+      const mode = st.until_empty ? "跑完即停" : "常驻";
+      if (st.running) {
+        if (st.phase === "ready") {
+          return `运行中 · pid ${st.pid} · ${mode} · 正在消费队列`;
+        }
+        if (st.phase === "loading_vlm") {
+          return `启动中 · pid ${st.pid} · 正在加载千问权重（约 10～30 秒，请看下方日志）`;
+        }
+        return `启动中 · pid ${st.pid} · 初始化 GPU / 模型…`;
+      }
+      if (st.phase === "crashed_native") {
+        return "进程异常退出（多为 GPU 显存冲突或重复点了多次启动）。请任务管理器结束多余的 python worker，只保留一个再重启。";
+      }
+      if (st.exit_code != null && st.exit_code !== 0) {
+        return `已退出 code=${st.exit_code}（见下方日志尾）`;
+      }
+      return "未运行（改 GPU/千问后请点「重启 Worker」）";
+    }
+
+    function setWorkerButtonsBusy(busy) {
+      ["workerRestart", "workerStart", "workerStop"].forEach(id => {
+        const b = document.getElementById(id);
+        if (b) b.disabled = !!busy;
+      });
+    }
+
+    async function refreshWorkerStatus() {
+      const st = await fetch("/api/pra/worker/status").then(r => r.json());
+      const el = document.getElementById("workerStatus");
+      el.textContent = formatWorkerStatusLine(st);
+      if (st.log_path) document.getElementById("workerLogHint").textContent = st.log_path;
+      const pre = document.getElementById("workerLogTail");
+      if (pre) pre.textContent = st.log_tail || "";
+      return st;
+    }
+
+    document.getElementById("workerRestart").addEventListener("click", async () => {
+      setWorkerButtonsBusy(true);
+      try {
+        const st = await fetch("/api/pra/worker/restart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(workerBody()),
+        }).then(async r => {
+          if (!r.ok) throw new Error(await r.text());
+          return r.json();
+        });
+        await refreshWorkerStatus();
+        if (!st.running) {
+          alert("Worker 未保持运行，请看配置页下方日志尾（可能千问加载失败或 GPU 被占用）");
+        } else if (st.phase !== "ready") {
+          alert(`已拉起进程 pid ${st.pid}。千问加载中，状态行会每 4 秒刷新，出现「正在消费队列」即就绪。`);
+        } else {
+          alert(`Worker 已重启，pid ${st.pid}`);
+        }
+      } catch (e) {
+        alert(e.message || "重启失败");
+        await refreshWorkerStatus();
+      } finally {
+        setWorkerButtonsBusy(false);
+      }
+    });
+
+    document.getElementById("workerStart").addEventListener("click", async () => {
+      setWorkerButtonsBusy(true);
+      try {
+        const st = await fetch("/api/pra/worker/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(workerBody()),
+        }).then(async r => {
+          if (!r.ok) throw new Error(await r.text());
+          return r.json();
+        });
+        await refreshWorkerStatus();
+        if (st.phase !== "ready") {
+          alert(`进程已启动 pid ${st.pid}。加载千问需要十几秒，请看下方日志与状态行，不要重复点启动。`);
+        } else {
+          alert(`Worker 已启动，pid ${st.pid}`);
+        }
+      } catch (e) {
+        alert(e.message || "启动失败");
+        await refreshWorkerStatus();
+      } finally {
+        setWorkerButtonsBusy(false);
+      }
+    });
+
+    document.getElementById("workerStop").addEventListener("click", async () => {
+      setWorkerButtonsBusy(true);
+      try {
+        await fetch("/api/pra/worker/stop", { method: "POST" });
+        await refreshWorkerStatus();
+      } finally {
+        setWorkerButtonsBusy(false);
+      }
+    });
+
+    document.getElementById("clearTestData").addEventListener("click", async () => {
+      const ok = window.confirm(
+        "将删除本机所有 run 的队列与识别记录，并清空 runtime 下的帧图、证据图、推送 JSON。\n\n配置与模型不会动。确定继续？"
+      );
+      if (!ok) return;
+      const msg = document.getElementById("clearTestDataMsg");
+      msg.textContent = "清空中…";
+      try {
+        const res = await fetch("/api/pra/clear-test-data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        });
+        let data = {};
+        try { data = await res.json(); } catch (_) {}
+        if (!res.ok) {
+          const detail = typeof data.detail === "string" ? data.detail : Array.isArray(data.detail) ? data.detail.map(d => d.msg).join("; ") : "";
+          if (res.status === 404) {
+            throw new Error("接口未找到：请先停止并重新运行 .\\run_pra.ps1 serve，再试清空");
+          }
+          throw new Error(detail || res.statusText);
+        }
+        msg.textContent = data.note || "已清空";
+        await refreshWorkerStatus();
+        await loadRuns();
+        document.getElementById("runDetail").hidden = true;
+        document.getElementById("runFrameFilters").hidden = true;
+        document.getElementById("runEmpty").hidden = false;
+        if (typeof refreshIngestStatus === "function") await refreshIngestStatus();
+        if (typeof refreshQueueHint === "function") await refreshQueueHint();
+      } catch (e) {
+        msg.textContent = "清空失败: " + e.message;
+      }
+    });
+
+    function chipClass(text, tone) {
+      if (tone === "ok") return "chip ok";
+      if (tone === "bad") return "chip bad";
+      if (tone === "warn") return "chip warn";
+      if (tone === "muted") return "chip muted";
+      if (!text) return "chip";
+      if (text.includes("预警") || text.includes("失败")) return "chip bad";
+      if (text.includes("未确认") || text.includes("跳过")) return "chip warn";
+      if (text.startsWith("已推")) return "chip ok";
+      return "chip";
+    }
+
+    function fmtConf(v) {
+      if (v == null || Number.isNaN(Number(v))) return "—";
+      return Number(v).toFixed(3);
+    }
+
+    function boxColor(box) {
+      if (box.confirmed) return "#e05c5c";
+      const t = String(box.qwen_label || "").toLowerCase();
+      if (t.includes("false") || t.includes("误报")) return "#c9a227";
+      if (!box.qwen_label) return "#8b98a8";
+      return "#6aa9e8";
+    }
+
+    function paintOverlay(svg, img, boxes) {
+      const w = img.naturalWidth || 1;
+      const h = img.naturalHeight || 1;
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      svg.replaceChildren();
+      const stroke = Math.max(3, Math.round(w / 320));
+      (boxes || []).forEach(box => {
+        const bbox = box.bbox || [];
+        if (bbox.length < 4) return;
+        const [x1, y1, x2, y2] = bbox.map(Number);
+        const color = boxColor(box);
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", x1); rect.setAttribute("y", y1);
+        rect.setAttribute("width", Math.max(1, x2 - x1)); rect.setAttribute("height", Math.max(1, y2 - y1));
+        rect.setAttribute("fill", "none"); rect.setAttribute("stroke", color); rect.setAttribute("stroke-width", stroke);
+        svg.appendChild(rect);
+      });
+    }
+
+    const lightboxEl = document.getElementById("lightbox");
+    const lightboxImg = document.getElementById("lightboxImg");
+    const lightboxSvg = document.getElementById("lightboxSvg");
+    let lightboxBoxes = [];
+
+    function openLightbox(job) {
+      if (!job.image_path) return;
+      lightboxBoxes = job.boxes || [];
+      document.getElementById("lightboxTitle").textContent = job.title || job.file_name || "原图";
+      lightboxEl.hidden = false;
+      const paint = () => {
+        const nw = lightboxImg.naturalWidth || 800;
+        document.getElementById("lightboxFrame").style.setProperty("--view-w", Math.min(nw, window.innerWidth - 32) + "px");
+        paintOverlay(lightboxSvg, lightboxImg, lightboxBoxes);
+      };
+      lightboxImg.onload = paint;
+      lightboxImg.src = fileUrl(job.image_path);
+      if (lightboxImg.complete) paint();
+    }
+
+    document.getElementById("lightboxClose").addEventListener("click", () => { lightboxEl.hidden = true; });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") lightboxEl.hidden = true; });
+
+    function jobThumbFrame(job) {
+      const frame = el("div", { className: "frame thumb preview", onclick: () => openLightbox(job) });
+      const img = el("img", { alt: job.file_name || "frame" });
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      const paint = () => paintOverlay(svg, img, job.boxes || []);
+      img.addEventListener("load", paint);
+      if (job.image_path) img.src = fileUrl(job.image_path);
+      frame.appendChild(img);
+      frame.appendChild(svg);
+      frame.appendChild(el("span", { className: "zoom-hint", text: "放大" }));
+      return frame;
+    }
+
+    function renderFeiliuLogDocuments(bodyEl, payload) {
+      bodyEl.replaceChildren();
+      const logs = payload.logs || [];
+      if (!logs.length) {
+        bodyEl.appendChild(el("p", { className: "muted", text: "未找到该帧的飞流落盘日志（可能为改版前的运行，或尚未产生预警推送）。可查看 push_records 目录。" }));
+        return;
+      }
+      logs.forEach((entry, idx) => {
+        const doc = entry.document_display || entry.document || {};
+        const text = JSON.stringify(doc, null, 2);
+        const block = el("div", { className: "push-log-attempt" });
+        const bar = el("div", { className: "push-log-toolbar" });
+        const title = doc.status || doc.meta?.mode || "log";
+        bar.appendChild(el("strong", { text: `推送日志 #${idx + 1} · ${title}` }));
+        const copyBtn = el("button", { type: "button", text: "复制 JSON（不含 picData）" });
+        copyBtn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            copyBtn.textContent = "已复制";
+            setTimeout(() => { copyBtn.textContent = "复制 JSON（不含 picData）"; }, 1500);
+          } catch (e) {
+            alert("复制失败，请手动选中下方文本");
+          }
+        });
+        bar.appendChild(copyBtn);
+        if (entry.path) {
+          bar.appendChild(el("span", { className: "muted", text: entry.path }));
+        }
+        block.appendChild(bar);
+        block.appendChild(el("pre", { text: text }));
+        bodyEl.appendChild(block);
+      });
+    }
+
+    function attachFeiliuLogLoader(det, job) {
+      const body = det.querySelector(".push-log-body");
+      let loaded = false;
+      det.addEventListener("toggle", async () => {
+        if (!det.open || loaded) return;
+        const jobId = job.job_id;
+        if (!jobId) {
+          body.replaceChildren(el("p", { className: "muted", text: "缺少 job_id，无法加载推送日志。" }));
+          return;
+        }
+        if (job.feiliu_log_entries && job.feiliu_log_entries.length) {
+          loaded = true;
+          renderFeiliuLogDocuments(body, { logs: job.feiliu_log_entries });
+          return;
+        }
+        body.replaceChildren(el("p", { className: "muted", text: "正在加载落盘日志…" }));
+        try {
+          const res = await fetch("/api/jobs/" + encodeURIComponent(jobId) + "/feiliu-logs");
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail ? String(err.detail) : "HTTP " + res.status);
+          }
+          const data = await res.json();
+          loaded = true;
+          renderFeiliuLogDocuments(body, data);
+        } catch (e) {
+          body.replaceChildren(el("p", { className: "muted", text: "加载失败: " + (e.message || e) + "（若刚升级工作台，请重启 serve 后强刷页面）" }));
+        }
+      });
+    }
+
+    function renderFeiliuPushLogs(job) {
+      const td = el("td", { className: "col-feiliu" });
+      const hasPush = job.feiliu_label && job.feiliu_label !== "未推" && job.feiliu_label !== "—";
+      if (!hasPush) {
+        td.appendChild(el("span", { className: "muted", text: "—" }));
+        return td;
+      }
+      const det = el("details", { className: "push-log" });
+      det.appendChild(el("summary", {}, [
+        el("span", { className: chipClass(job.feiliu_label, job.feiliu_chip_tone), text: job.feiliu_label }),
+        el("span", { className: "muted", text: " · 展开完整推送日志" })
+      ]));
+      const body = el("div", { className: "push-log-body" });
+      body.appendChild(el("p", { className: "muted", text: "展开后加载联调日志（meta、attempts、response 等；picData 仅显示长度，完整 Base64 在落盘文件中）。" }));
+      det.appendChild(body);
+      attachFeiliuLogLoader(det, job);
+      td.appendChild(det);
+      return td;
+    }
+
+    function renderBoxesTable(boxes) {
+      const table = el("table", { className: "boxes" });
+      table.appendChild(el("thead", {}, [el("tr", {}, [
+        el("th", { text: "框" }), el("th", { text: "YOLO" }), el("th", { text: "置信度" }),
+        el("th", { text: "千问" }), el("th", { text: "说明" })
+      ])]));
+      const tbody = el("tbody");
+      (boxes || []).forEach(box => {
+        tbody.appendChild(el("tr", { className: box.flipped ? "flipped" : "" }, [
+          el("td", { className: "num", text: "#" + box.id }),
+          el("td", { text: box.yolo_class || "person" }),
+          el("td", { text: fmtConf(box.yolo_confidence) }),
+          el("td", { text: box.qwen_label || "未复核" }),
+          el("td", { text: box.qwen_description || "" })
+        ]));
+      });
+      table.appendChild(tbody);
+      return table;
+    }
+
+    function renderJobRow(job) {
+      const frameCat = frameStatusCategory(job);
+      const tr = el("tr", { className: "job-row" });
+      tr.dataset.frameStatus = frameCat;
+      const thumbTd = el("td", { className: "col-thumb" });
+      thumbTd.appendChild(jobThumbFrame(job));
+      tr.appendChild(thumbTd);
+
+      const frameTd = el("td", { className: "col-frame" });
+      frameTd.appendChild(el("div", { className: "frame-title", text: job.title || job.file_name || job.job_id }));
+      frameTd.appendChild(el("span", {
+        className: "chip muted",
+        text: frameStatusLabel(frameCat),
+        style: "margin-top:4px;display:inline-block",
+      }));
+      frameTd.appendChild(el("details", { className: "raw" }, [
+        el("summary", { text: "原始 JSON" }),
+        el("pre", { text: JSON.stringify(job.raw || job, null, 2) })
+      ]));
+      tr.appendChild(frameTd);
+
+      tr.appendChild(el("td", {}, [el("span", { className: chipClass(job.outcome), text: job.outcome || "—" })]));
+      tr.appendChild(el("td", {}, [el("span", { className: chipClass(job.ims_label, job.ims_chip_tone), text: job.ims_label || "—" })]));
+      tr.appendChild(renderFeiliuPushLogs(job));
+      tr.appendChild(el("td", { className: "muted", text: job.time || "—" }));
+
+      const boxesTd = el("td", { className: "col-boxes" });
+      const boxes = job.boxes || [];
+      if (!boxes.length) {
+        boxesTd.appendChild(el("span", { className: "muted", text: job.outcome || "无检测框" }));
+      } else if (boxes.length === 1 && !(boxes[0].qwen_description || "").length) {
+        boxesTd.appendChild(renderBoxesTable(boxes));
+      } else {
+        const det = el("details", { className: "job-more" });
+        det.appendChild(el("summary", { text: `${boxes.length} 个检测框` }));
+        det.appendChild(renderBoxesTable(boxes));
+        boxesTd.appendChild(det);
+      }
+      tr.appendChild(boxesTd);
+      return tr;
+    }
+
+    function renderJobsList(jobs) {
+      const table = el("table", { className: "jobs-db" });
+      table.appendChild(el("thead", {}, [el("tr", {}, [
+        el("th", { text: "缩略图" }),
+        el("th", { text: "帧 / 文件" }),
+        el("th", { text: "识别" }),
+        el("th", { text: "IMS" }),
+        el("th", { text: "飞流" }),
+        el("th", { text: "时间" }),
+        el("th", { text: "检测框" })
+      ])]));
+      const tbody = el("tbody");
+      (jobs || []).forEach(job => tbody.appendChild(renderJobRow(job)));
+      table.appendChild(tbody);
+      return el("div", { className: "jobs-db-wrap" }, [table]);
+    }
+
+    function allRunIdsFromIndex(data) {
+      const ids = new Set();
+      (data.dates || []).forEach(g => (g.runs || []).forEach(r => ids.add(r.run_id)));
+      return ids;
+    }
+
+    async function openRun(runId, btn) {
+      document.querySelectorAll(".run").forEach(n => n.classList.remove("active"));
+      if (btn) btn.classList.add("active");
+      const res = await fetch("/api/runs/" + encodeURIComponent(runId));
+      if (!res.ok) {
+        selectedRunId = null;
+        const empty = document.getElementById("runEmpty");
+        empty.hidden = false;
+        empty.textContent = res.status === 404
+          ? "该次运行已不存在（可能已清空测试数据）。请点左侧列表中的记录。"
+          : `读取失败（HTTP ${res.status}）`;
+        document.getElementById("runDetail").hidden = true;
+        document.getElementById("runFrameFilters").hidden = true;
+        if (res.status === 404) {
+          const q = new URLSearchParams(location.search);
+          if (q.get("run") === runId) {
+            q.delete("run");
+            const tail = q.toString();
+            history.replaceState(null, "", tail ? "?" + tail : location.pathname);
+          }
+        }
+        return;
+      }
+      selectedRunId = runId;
+      const data = await res.json();
+      const run = data.run || {};
+      document.getElementById("runEmpty").hidden = true;
+      document.getElementById("runDetail").hidden = false;
+      document.getElementById("runTitle").textContent =
+        `${run.date || ""} ${run.time || ""} ${run.source_label || "任务"}`.trim();
+      document.getElementById("runMeta").textContent = run.summary || "";
+      document.getElementById("runId").textContent = run.run_id || runId;
+      currentRunJobs = data.jobs || [];
+      currentFrameFilter = "all";
+      renderRunJobsTable();
+      history.replaceState(null, "", "?run=" + encodeURIComponent(runId));
+      document.getElementById("exportJson").onclick = () => window.open("/api/runs/" + encodeURIComponent(runId) + "/export?format=json", "_blank");
+      document.getElementById("exportCsv").onclick = () => window.open("/api/runs/" + encodeURIComponent(runId) + "/export?format=csv", "_blank");
+    }
+
+    async function refreshIngestStatus() {
+      const st = await fetch("/api/pra/ingest/status").then(r => r.json());
+      let text = "收流未启动";
+      if (st.running) {
+        text = `收流中 · ${st.mode} · run=${st.run_id}`;
+        if (st.frames_ingested) text += ` · 已入队 ${st.frames_ingested} 帧`;
+        if (st.message && st.message.includes("Worker")) text += ` · ${st.message}`;
+      } else if (st.error) {
+        text = `失败: ${st.error}`;
+      } else if (st.message) {
+        text = st.message;
+      } else if (st.finished && st.frames_ingested) {
+        text = `已完成，入队 ${st.frames_ingested} 帧 · run=${st.run_id}`;
+      }
+      document.getElementById("ingestStatus").textContent = text;
+      if (st.run_id) document.getElementById("ingest_run_id").value = st.run_id;
+    }
+
+    async function refreshQueueHint() {
+      const q = await fetch("/api/pra/queue/summary").then(r => r.json());
+      const el = document.getElementById("queueWorkerHint");
+      if (q.needs_worker) {
+        el.textContent = `队列中有 ${q.by_status?.queued || "?"} 个任务待识别。请到「配置」页启动 Worker，或重新点「开始收流」（会自动拉起 Worker）。`;
+      } else {
+        el.textContent = q.empty ? "" : "当前 run 队列已处理或为空。";
+      }
+    }
+
+    document.getElementById("newRun").addEventListener("click", async () => {
+      const d = await fetch("/api/pra/runs/new").then(r => r.json());
+      document.getElementById("ingest_run_id").value = d.run_id;
+      alert(d.note);
+    });
+
+    function syncRtmpIngestFields() {
+      const mode = document.getElementById("rtmp_mode").value;
+      const remote = mode === "remote_pull";
+      const folder = mode === "image_folder";
+      document.getElementById("rtmp_custom_pull_label").style.display = remote ? "" : "none";
+      document.getElementById("rtmp_custom_pull_url").style.display = remote ? "" : "none";
+      document.getElementById("image_folder_path_label").style.display = folder ? "" : "none";
+      document.getElementById("image_folder_path").style.display = folder ? "" : "none";
+    }
+    document.getElementById("rtmp_mode").addEventListener("change", () => {
+      syncRtmpIngestFields();
+      syncIngestModeHint();
+    });
+
+    function syncIngestModeHint() {
+      const mode = document.getElementById("rtmp_mode").value;
+      const statusEl = document.getElementById("ingestStatus");
+      if (mode !== "image_folder") return;
+      const p = document.getElementById("image_folder_path").value.trim();
+      if (!p && !statusEl.textContent.includes("收流")) {
+        statusEl.textContent = "文件夹模式：请填写图片目录（可填 D: 盘路径），再点「开始收流」。";
+      }
+    }
+
+    function formatApiError(data, status) {
+      const d = data?.detail;
+      if (typeof d === "string") return d;
+      if (Array.isArray(d)) return d.map(x => x.msg || JSON.stringify(x)).join("; ");
+      return data?.message || `HTTP ${status}`;
+    }
+
+    document.getElementById("ingestStart").addEventListener("click", async () => {
+      const btn = document.getElementById("ingestStart");
+      const statusEl = document.getElementById("ingestStatus");
+      btn.disabled = true;
+      statusEl.textContent = "正在提交收流请求…";
+      const mode = document.getElementById("rtmp_mode").value;
+      const video_path = document.getElementById("simulate_video").value.trim() || null;
+      const pull_url = document.getElementById("rtmp_custom_pull_url").value.trim() || null;
+      let folder_path = document.getElementById("image_folder_path").value.trim() || null;
+      if ((mode === "simulate" || mode === "file") && !video_path) {
+        btn.disabled = false;
+        alert("请填写模拟/成片视频完整路径（含 .mp4）");
+        statusEl.textContent = "收流未启动";
+        return;
+      }
+      if (mode === "image_folder" && !folder_path) {
+        try {
+          const cfg = await fetch("/api/pra/config").then(r => r.json());
+          folder_path = (cfg.ingest?.image_folder_path || "").trim() || null;
+          if (folder_path) document.getElementById("image_folder_path").value = folder_path;
+        } catch (_) {}
+      }
+      if (mode === "image_folder" && !folder_path) {
+        btn.disabled = false;
+        alert("请填写图片文件夹路径（例如 /path/to/rtmp_watch 或 C:\\data\\rtmp_watch）");
+        statusEl.textContent = "文件夹模式：路径为空，无法启动";
+        return;
+      }
+      if (mode === "remote_pull" && !pull_url) {
+        try {
+          const cfg = await fetch("/api/pra/config").then(r => r.json());
+          const saved = (cfg.ingest?.rtmp_custom_pull_url || "").trim();
+          if (saved) {
+            document.getElementById("rtmp_custom_pull_url").value = saved;
+            pull_url = saved;
+          }
+        } catch (_) {}
+      }
+      if (mode === "remote_pull" && !pull_url) {
+        btn.disabled = false;
+        alert("请填写自定义拉流 URL（萤石 openlive 等完整地址），或在配置页保存 ingest.rtmp_custom_pull_url");
+        statusEl.textContent = "remote_pull：缺少拉流 URL";
+        return;
+      }
+      const body = {
+        mode,
+        run_id: document.getElementById("ingest_run_id").value || null,
+        video_path,
+        folder_path,
+        pull_url,
+      };
+      statusEl.textContent = mode === "image_folder"
+        ? "正在扫描并入队图片（大量图片需等待数十秒，请看本行状态）…"
+        : "正在启动收流…";
+      try {
+        const res = await fetch("/api/pra/ingest/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        let data = {};
+        try { data = await res.json(); } catch (_) {}
+        if (!res.ok) {
+          const msg = formatApiError(data, res.status);
+          statusEl.textContent = `启动失败：${msg}`;
+          alert(`收流启动失败：${msg}`);
+          return;
+        }
+        statusEl.textContent = `收流已启动 · ${data.mode || mode} · run=${data.run_id || "?"}`;
+        if (data.frames_ingested) statusEl.textContent += ` · 已入队 ${data.frames_ingested} 帧`;
+        await refreshIngestStatus();
+        refreshWorkerStatus();
+        loadRuns();
+      } catch (e) {
+        statusEl.textContent = `请求失败：${e.message || e}`;
+        alert("收流请求失败：" + (e.message || e));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById("ingestStop").addEventListener("click", async () => {
+      await fetch("/api/pra/ingest/stop", { method: "POST" });
+      await refreshIngestStatus();
+    });
+
+    document.getElementById("fileIngest").addEventListener("click", async () => {
+      const path = document.getElementById("file_ingest_path").value.trim();
+      if (!path) return alert("填写路径");
+      const run_id = document.getElementById("ingest_run_id").value || null;
+      const res = await fetch("/api/pra/ingest/file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, run_id }),
+      }).then(r => r.json());
+      alert(`入队 ${res.jobs} 帧，run=${res.run_id}`);
+      loadRuns();
+    });
+
+    function mountPreview(el, job, withBoxes) {
+      el.replaceChildren();
+      if (!job || !job.image_path) {
+        el.appendChild(el("div", { className: "muted", text: "暂无帧" }));
+        return;
+      }
+      const img = el("img", { alt: "frame" });
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      const paint = () => { if (withBoxes) paintOverlay(svg, img, job.boxes || []); };
+      img.addEventListener("load", paint);
+      img.src = fileUrl(job.image_path);
+      el.appendChild(img);
+      if (withBoxes) el.appendChild(svg);
+      if (img.complete) paint();
+    }
+
+    async function loadPreview() {
+      const data = await fetch("/api/pra/preview/latest").then(r => r.json());
+      if (data.empty) {
+        document.getElementById("prevMeta").textContent = "等待收流或 worker 产出";
+        return;
+      }
+      const job = data.job || {};
+      mountPreview(document.getElementById("prevRaw"), job, false);
+      mountPreview(document.getElementById("prevBox"), job, true);
+      document.getElementById("prevMeta").textContent =
+        `${job.title || ""} · ${job.outcome || ""} · run ${data.run_id}`;
+    }
+
+    async function loadRuns() {
+      const data = await fetch("/api/runs").then(r => r.json());
+      const listEl = document.getElementById("runsList");
+      listEl.replaceChildren();
+      const groups = data.dates || [];
+      if (!groups.length) {
+        listEl.appendChild(el("div", { className: "muted", text: "暂无记录。先跑 ingest + worker。" }));
+        return;
+      }
+      const knownIds = allRunIdsFromIndex(data);
+      groups.forEach(group => {
+        listEl.appendChild(el("div", { className: "date-label", text: group.date || "未知日期" }));
+        (group.runs || []).forEach(run => {
+          const btn = el("button", {
+            type: "button",
+            className: "run" + (run.run_id === selectedRunId ? " active" : ""),
+            onclick: () => openRun(run.run_id, btn)
+          }, [
+            el("div", { className: "title", text: `${run.time || ""} ${run.source_label || ""}`.trim() }),
+            el("div", { className: "muted", text: run.summary || run.run_id })
+          ]);
+          listEl.appendChild(btn);
+        });
+      });
+      const fromUrl = new URLSearchParams(location.search).get("run");
+      if (selectedRunId && !knownIds.has(selectedRunId)) {
+        selectedRunId = null;
+        document.getElementById("runDetail").hidden = true;
+        document.getElementById("runFrameFilters").hidden = true;
+        document.getElementById("runEmpty").hidden = false;
+        document.getElementById("runEmpty").textContent = "当前选中的运行已不存在，请点左侧列表。";
+      }
+      if (fromUrl && !knownIds.has(fromUrl)) {
+        const q = new URLSearchParams(location.search);
+        q.delete("run");
+        const tail = q.toString();
+        history.replaceState(null, "", tail ? "?" + tail : location.pathname);
+      }
+      if (fromUrl && knownIds.has(fromUrl) && !selectedRunId) {
+        tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === "runs"));
+        document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+        document.getElementById("panel-runs").classList.add("active");
+        openRun(fromUrl, null);
+      } else if (!selectedRunId && knownIds.size === 1) {
+        const only = [...knownIds][0];
+        openRun(only, null);
+      }
+    }
+
+    function syncHeaderHeight() {
+      const hdr = document.querySelector("header");
+      if (hdr) document.documentElement.style.setProperty("--header-h", hdr.offsetHeight + "px");
+    }
+    syncHeaderHeight();
+    window.addEventListener("resize", syncHeaderHeight);
+
+    loadHops();
+    document.getElementById("yolo_weights_preset").addEventListener("change", applyYoloPresetSelection);
+    document.getElementById("yolo_weights_path").addEventListener("input", syncYoloPresetFromPath);
+    document.getElementById("qwen_vl_preset").addEventListener("change", applyQwenVlPresetSelection);
+    document.getElementById("qwen_dir_path").addEventListener("input", syncQwenVlPresetFromPath);
+
+    initRoiEditor();
+    loadYoloWeightPresets()
+      .then(() => loadFrozenOptions())
+      .then(() => loadConfig());
+    async function probeClearTestDataApi() {
+      const btn = document.getElementById("clearTestData");
+      const hint = document.getElementById("clearTestDataMsg");
+      if (!btn) return;
+      try {
+        const r = await fetch("/api/pra/clear-test-data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: false }),
+        });
+        if (r.status === 404) {
+          btn.disabled = true;
+          hint.textContent = "当前 serve 进程较旧，请重启 run_pra.ps1 serve 后再使用清空。";
+        }
+      } catch (_) {}
+    }
+
+    loadRuns();
+    refreshIngestStatus();
+    refreshQueueHint();
+    probeClearTestDataApi();
+    refreshWorkerStatus();
+    loadPreview();
+    setInterval(loadHops, 15000);
+    setInterval(refreshWorkerStatus, 4000);
+    setInterval(refreshQueueHint, 8000);
+    setInterval(loadRuns, 12000);
+    setInterval(refreshIngestStatus, 5000);
+    setInterval(loadPreview, 3000);
+  </script>
+</body>
+</html>

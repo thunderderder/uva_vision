@@ -1,0 +1,12 @@
+{
+  "image": "data/test_img/30m-human.jpg",
+  "labeled_at": "2026-09-04",
+  "frozen_as": "p1_v1_20260904",
+  "note": "人工看图。ID 对应当前 YOLO 编号（person 置信度约 0.057 / 0.028 / 0.019 / 0.015）。冻结版没有 person_ok，#4 模型会判 false_detect，基线接受。",
+  "boxes": [
+    {"id": 1, "verdict": "fishing", "alert": true, "note": "岸边钓鱼，应预警"},
+    {"id": 2, "verdict": "false_detect", "alert": false, "note": "水草，不是人"},
+    {"id": 3, "verdict": "false_detect", "alert": false, "note": "水草，不是人"},
+    {"id": 4, "verdict": "person_ok", "alert": false, "note": "可能和 1 一起，目前看起来安全", "accepted_pred": "false_detect"}
+  ]
+}

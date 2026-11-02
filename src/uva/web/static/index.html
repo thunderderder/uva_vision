@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UVA 技术审计</title>
+  <style>
+    :root {
+      --bg:#101418; --card:#1b222b; --text:#e8eef6; --muted:#8b98a8;
+      --line:#2c3642; --ok:#3d9a6a; --warn:#c9a227; --bad:#c45c5c; --accent:#4d8fd6;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; background:var(--bg); color:var(--text); }
+    header { padding:16px 24px; border-bottom:1px solid var(--line); }
+    header h1 { margin:0; font-size:18px; font-weight:600; }
+    header p { margin:6px 0 0; color:var(--muted); font-size:13px; }
+    main { display:grid; grid-template-columns: 300px 1fr; min-height:calc(100vh - 72px); }
+    aside { border-right:1px solid var(--line); overflow:auto; padding:12px; }
+    section { overflow:auto; padding:20px 24px 48px; }
+    .date-label { margin:16px 8px 8px; color:var(--muted); font-size:12px; letter-spacing:.04em; }
+    .date-label:first-child { margin-top:4px; }
+    .run {
+      display:block; width:100%; text-align:left; color:inherit; font:inherit;
+      padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+      margin-bottom:8px; cursor:pointer; background:var(--card);
+    }
+    .run.active { outline:1px solid var(--accent); }
+    .run .title { font-size:14px; }
+    .muted { color:var(--muted); font-size:12px; }
+    .run-head { display:flex; justify-content:space-between; gap:16px; align-items:baseline; margin-bottom:16px; }
+    .run-head h2 { margin:0; font-size:20px; font-weight:600; }
+    .job {
+      background:var(--card); border:1px solid var(--line); border-radius:12px;
+      padding:16px; margin-bottom:16px;
+    }
+    .job-head { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:baseline; margin-bottom:12px; }
+    .job-head h3 { margin:0; font-size:16px; font-weight:600; }
+    .chip { display:inline-block; padding:2px 8px; border-radius:999px; background:#243044; font-size:12px; }
+    .chip.warn { background:#3a3218; color:#e6c56a; }
+    .chip.bad { background:#3a2020; color:#e08a8a; }
+    .chip.ok { background:#1c3328; color:#7dcca3; }
+    .chip.muted { background:#1e2430; color:#8b98a8; }
+    .job-grid { display:grid; grid-template-columns: minmax(280px, 42%) 1fr; gap:16px; align-items:start; }
+    .frame { position:relative; background:#000; border-radius:8px; overflow:hidden; }
+    .frame img, .frame svg { display:block; width:100%; height:auto; }
+    .frame svg { position:absolute; inset:0; pointer-events:none; }
+    .frame.preview { cursor:zoom-in; }
+    .frame.preview:focus { outline:1px solid var(--accent); outline-offset:2px; }
+    .zoom-hint {
+      position:absolute; right:8px; bottom:8px; z-index:1;
+      padding:2px 8px; border-radius:999px; background:rgba(0,0,0,.62);
+      color:#e8eef6; font-size:12px; pointer-events:none;
+    }
+    .lightbox {
+      position:fixed; inset:0; z-index:80; display:flex; flex-direction:column;
+      background:rgba(8,10,12,.92);
+    }
+    .lightbox[hidden] { display:none; }
+    .lightbox-bar {
+      flex:0 0 auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+      padding:10px 16px; border-bottom:1px solid var(--line); background:#12181f;
+    }
+    .lightbox-bar strong { font-size:14px; font-weight:600; }
+    .lightbox-bar .spacer { flex:1; }
+    .lightbox-bar button {
+      color:var(--text); background:#243044; border:1px solid var(--line);
+      border-radius:8px; padding:6px 12px; font:inherit; cursor:pointer;
+    }
+    .lightbox-bar button:hover { border-color:var(--accent); }
+    .lightbox-stage { flex:1; overflow:auto; cursor:grab; }
+    .lightbox-stage.dragging { cursor:grabbing; }
+    .lightbox-frame { position:relative; margin:16px auto; width:max-content; background:#000; }
+    .lightbox-frame img, .lightbox-frame svg { width:var(--view-w); height:auto; max-width:none; }
+    table.boxes { width:100%; border-collapse:collapse; font-size:14px; }
+    table.boxes th { text-align:left; color:#c5d0dc; font-weight:600; font-size:12px; padding:0 8px 8px; border-bottom:1px solid var(--line); }
+    table.boxes td { padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top; color:var(--text); }
+    table.boxes tr.flipped td { background:#2a2218; }
+    .num { font-weight:700; color:#fff; }
+    .empty-row { color:var(--muted); padding:12px 0; }
+    .history { margin:8px 0 0; color:var(--muted); font-size:12px; line-height:1.5; }
+    details.raw { margin-top:12px; }
+    details.raw summary { cursor:pointer; color:var(--muted); font-size:13px; }
+    pre { background:#0d1218; border:1px solid var(--line); border-radius:8px; padding:10px; overflow:auto; max-height:320px; white-space:pre-wrap; font-size:12px; }
+    @media (max-width: 980px) {
+      main, .job-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>UVA 技术审计</h1>
+    <p>按日期看任务集合，按图看每个检测框。业务核实在 IMS「AI巡查结果」，这里只做开发追溯。</p>
+  </header>
+  <main>
+    <aside>
+      <div id="runs"></div>
+    </aside>
+    <section>
+      <div id="empty" class="muted">从左侧选一个任务集合。</div>
+      <div id="detail" hidden>
+        <div class="run-head">
+          <div>
+            <h2 id="runTitle"></h2>
+            <p class="muted" id="runMeta"></p>
+          </div>
+          <div class="muted" id="runId"></div>
+        </div>
+        <div id="jobs"></div>
+      </div>
+    </section>
+  </main>
+  <div id="lightbox" class="lightbox" hidden role="dialog" aria-modal="true" aria-labelledby="lightboxTitle">
+    <div class="lightbox-bar">
+      <strong id="lightboxTitle">查看原图</strong>
+      <span class="muted">滚轮缩放 · 拖动平移 · Esc 关闭</span>
+      <span class="spacer"></span>
+      <button type="button" id="lightboxFit">适应窗口</button>
+      <button type="button" id="lightboxNative">原尺寸</button>
+      <button type="button" id="lightboxClose">关闭</button>
+    </div>
+    <div class="lightbox-stage" id="lightboxStage">
+      <div class="frame lightbox-frame" id="lightboxFrame">
+        <img id="lightboxImg" alt="" />
+        <svg id="lightboxSvg"></svg>
+      </div>
+    </div>
+  </div>
+  <script>
+    const runsEl = document.getElementById("runs");
+    const emptyEl = document.getElementById("empty");
+    const detailEl = document.getElementById("detail");
+    const jobsEl = document.getElementById("jobs");
+    const lightboxEl = document.getElementById("lightbox");
+    const lightboxStage = document.getElementById("lightboxStage");
+    const lightboxFrame = document.getElementById("lightboxFrame");
+    const lightboxImg = document.getElementById("lightboxImg");
+    const lightboxSvg = document.getElementById("lightboxSvg");
+    const lightboxTitle = document.getElementById("lightboxTitle");
+    let selectedRunId = null;
+    let lastRunsJson = "";
+    let lightboxBoxes = [];
+    let lightboxZoom = 1;
+    let drag = null;
+
+    function el(tag, attrs, children) {
+      const node = document.createElement(tag);
+      Object.entries(attrs || {}).forEach(([key, value]) => {
+        if (value == null || value === false) return;
+        if (key === "className") node.className = value;
+        else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2).toLowerCase(), value);
+        else if (key === "text") node.textContent = value;
+        else node.setAttribute(key, value);
+      });
+      (children || []).forEach(child => {
+        if (child == null || child === false) return;
+        node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+      });
+      return node;
+    }
+
+    function fileUrl(path) {
+      return path ? "/api/file?path=" + encodeURIComponent(path) : "";
+    }
+
+    function fmtConf(value) {
+      if (value == null || Number.isNaN(Number(value))) return "—";
+      return Number(value).toFixed(3);
+    }
+
+    function boxOverlayLabel(box) {
+      const id = "#" + box.id;
+      if (box.yolo_confidence == null || Number.isNaN(Number(box.yolo_confidence))) return id;
+      return id + " " + Number(box.yolo_confidence).toFixed(3);
+    }
+
+    function chipClass(text, tone) {
+      if (tone === "ok") return "chip ok";
+      if (tone === "bad") return "chip bad";
+      if (tone === "warn") return "chip warn";
+      if (tone === "muted") return "chip muted";
+      if (!text) return "chip";
+      if (text.includes("预警") || text.includes("失败")) return "chip bad";
+      if (text.includes("未确认") || text.includes("跳过")) return "chip warn";
+      if (text.startsWith("已推")) return "chip ok";
+      return "chip";
+    }
+
+    function boxColor(box) {
+      if (box.confirmed) return "#e05c5c";
+      const type = String(box.qwen_type || "").toLowerCase();
+      if (type.includes("false") || type.includes("误报")) return "#c9a227";
+      if (type === "normal" || type === "person_ok") return "#6aa9e8";
+      if (!box.qwen_type) return "#8b98a8";
+      return "#c9a227";
+    }
+
+    function paintOverlay(svg, img, boxes) {
+      const w = img.naturalWidth || 1;
+      const h = img.naturalHeight || 1;
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      svg.replaceChildren();
+      const stroke = Math.max(3, Math.round(w / 320));
+      (boxes || []).forEach(box => {
+        const bbox = box.bbox || [];
+        if (bbox.length < 4) return;
+        const [x1, y1, x2, y2] = bbox.map(Number);
+        const color = boxColor(box);
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", x1);
+        rect.setAttribute("y", y1);
+        rect.setAttribute("width", Math.max(1, x2 - x1));
+        rect.setAttribute("height", Math.max(1, y2 - y1));
+        rect.setAttribute("fill", "none");
+        rect.setAttribute("stroke", color);
+        rect.setAttribute("stroke-width", stroke);
+        const font = Math.max(18, Math.round(w / 55));
+        const label = boxOverlayLabel(box);
+        const pad = Math.round(font * 0.28);
+        const tw = font * 0.7 * label.length + pad * 2;
+        const th = font + pad;
+        const lx = x1;
+        const ly = Math.max(0, y1 - th - 2);
+        const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        bg.setAttribute("x", lx);
+        bg.setAttribute("y", ly);
+        bg.setAttribute("width", tw);
+        bg.setAttribute("height", th);
+        bg.setAttribute("rx", 4);
+        bg.setAttribute("fill", color);
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", lx + pad);
+        text.setAttribute("y", ly + font * 0.85);
+        text.setAttribute("fill", "#fff");
+        text.setAttribute("font-size", font);
+        text.setAttribute("font-weight", "700");
+        text.textContent = label;
+        svg.appendChild(rect);
+        svg.appendChild(bg);
+        svg.appendChild(text);
+      });
+    }
+
+    function lightboxFitZoom() {
+      const nw = lightboxImg.naturalWidth || 1;
+      const nh = lightboxImg.naturalHeight || 1;
+      const sw = Math.max(120, lightboxStage.clientWidth - 32);
+      const sh = Math.max(120, lightboxStage.clientHeight - 32);
+      return Math.min(sw / nw, sh / nh, 1);
+    }
+
+    function applyLightboxZoom() {
+      const nw = lightboxImg.naturalWidth || 1;
+      lightboxFrame.style.setProperty("--view-w", Math.max(1, Math.round(nw * lightboxZoom)) + "px");
+      paintOverlay(lightboxSvg, lightboxImg, lightboxBoxes);
+    }
+
+    function openLightbox(job) {
+      if (!job.image_path) return;
+      lightboxBoxes = job.boxes || [];
+      lightboxTitle.textContent = job.title || job.file_name || "查看原图";
+      lightboxImg.alt = job.file_name || "frame";
+      lightboxEl.hidden = false;
+      document.body.style.overflow = "hidden";
+      const paint = () => {
+        lightboxZoom = lightboxFitZoom();
+        applyLightboxZoom();
+      };
+      lightboxImg.onload = paint;
+      lightboxImg.src = fileUrl(job.image_path);
+      if (lightboxImg.complete && lightboxImg.naturalWidth) paint();
+    }
+
+    function closeLightbox() {
+      lightboxEl.hidden = true;
+      document.body.style.overflow = "";
+      drag = null;
+      lightboxStage.classList.remove("dragging");
+    }
+
+    lightboxStage.addEventListener("wheel", (event) => {
+      if (lightboxEl.hidden) return;
+      event.preventDefault();
+      const min = lightboxFitZoom() * 0.5;
+      const max = 3;
+      const next = Math.min(max, Math.max(min, lightboxZoom * (event.deltaY > 0 ? 0.9 : 1.1)));
+      const rect = lightboxStage.getBoundingClientRect();
+      const px = event.clientX - rect.left + lightboxStage.scrollLeft;
+      const py = event.clientY - rect.top + lightboxStage.scrollTop;
+      const ratio = next / lightboxZoom;
+      lightboxZoom = next;
+      applyLightboxZoom();
+      lightboxStage.scrollLeft = px * ratio - (event.clientX - rect.left);
+      lightboxStage.scrollTop = py * ratio - (event.clientY - rect.top);
+    }, { passive: false });
+
+    lightboxStage.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || lightboxEl.hidden) return;
+      drag = {
+        x: event.clientX,
+        y: event.clientY,
+        left: lightboxStage.scrollLeft,
+        top: lightboxStage.scrollTop
+      };
+      lightboxStage.classList.add("dragging");
+      lightboxStage.setPointerCapture(event.pointerId);
+    });
+    lightboxStage.addEventListener("pointermove", (event) => {
+      if (!drag) return;
+      lightboxStage.scrollLeft = drag.left - (event.clientX - drag.x);
+      lightboxStage.scrollTop = drag.top - (event.clientY - drag.y);
+    });
+    function endDrag() {
+      drag = null;
+      lightboxStage.classList.remove("dragging");
+    }
+    lightboxStage.addEventListener("pointerup", endDrag);
+    lightboxStage.addEventListener("pointercancel", endDrag);
+    document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
+    document.getElementById("lightboxFit").addEventListener("click", () => {
+      lightboxZoom = lightboxFitZoom();
+      applyLightboxZoom();
+    });
+    document.getElementById("lightboxNative").addEventListener("click", () => {
+      lightboxZoom = 1;
+      applyLightboxZoom();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !lightboxEl.hidden) closeLightbox();
+    });
+
+    async function loadRuns() {
+      const res = await fetch("/api/runs");
+      const data = await res.json();
+      const serialized = JSON.stringify(data);
+      if (serialized === lastRunsJson && runsEl.children.length) return;
+      lastRunsJson = serialized;
+      runsEl.replaceChildren();
+      (data.dates || []).forEach(group => {
+        runsEl.appendChild(el("div", { className: "date-label", text: group.date || "未知日期" }));
+        (group.runs || []).forEach(run => {
+          const btn = el("button", {
+            type: "button",
+            className: "run" + (run.run_id === selectedRunId ? " active" : ""),
+            onclick: () => openRun(run.run_id, btn)
+          }, [
+            el("div", { className: "title", text: `${run.time || ""}  ${run.source_label || "任务"}`.trim() }),
+            el("div", { className: "muted", text: run.summary || "" })
+          ]);
+          runsEl.appendChild(btn);
+        });
+      });
+      if (!(data.dates || []).length) {
+        runsEl.appendChild(el("div", { className: "muted", text: "还没有任务。" }));
+      }
+    }
+
+    async function openRun(runId, btn) {
+      selectedRunId = runId;
+      document.querySelectorAll(".run").forEach(node => node.classList.remove("active"));
+      if (btn) btn.classList.add("active");
+      const res = await fetch("/api/runs/" + encodeURIComponent(runId));
+      if (!res.ok) {
+        emptyEl.hidden = false;
+        detailEl.hidden = true;
+        emptyEl.textContent = "任务读失败";
+        return;
+      }
+      const data = await res.json();
+      const run = data.run || {};
+      emptyEl.hidden = true;
+      detailEl.hidden = false;
+      document.getElementById("runTitle").textContent = `${run.date || ""} ${run.time || ""}  ${run.source_label || "任务"}`.trim();
+      document.getElementById("runMeta").textContent = run.summary || "";
+      document.getElementById("runId").textContent = run.run_id || runId;
+      jobsEl.replaceChildren();
+      (data.jobs || []).forEach(job => jobsEl.appendChild(renderJob(job)));
+    }
+
+    function renderJob(job) {
+      const article = el("article", { className: "job" });
+      article.appendChild(el("div", { className: "job-head" }, [
+        el("h3", { text: job.title || job.file_name || job.job_id }),
+        el("span", { className: chipClass(job.outcome), text: job.outcome || "" }),
+        el("span", { className: chipClass(job.ims_label, job.ims_chip_tone), text: job.ims_label || "" }),
+        el("span", { className: chipClass(job.feiliu_label, job.feiliu_chip_tone), text: job.feiliu_label || "" }),
+        el("span", { className: "muted", text: job.time || "" })
+      ]));
+
+      const grid = el("div", { className: "job-grid" });
+      const frame = el("div", {
+        className: "frame preview",
+        role: "button",
+        tabIndex: "0",
+        title: "点击放大查看细节",
+        onclick: () => openLightbox(job),
+        onkeydown: (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openLightbox(job);
+          }
+        }
+      });
+      const img = el("img", { alt: job.file_name || "frame" });
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      const paint = () => paintOverlay(svg, img, job.boxes || []);
+      img.addEventListener("load", paint);
+      if (job.image_path) img.src = fileUrl(job.image_path);
+      frame.appendChild(img);
+      frame.appendChild(svg);
+      frame.appendChild(el("span", { className: "zoom-hint", text: "点击放大" }));
+      if (img.complete && img.naturalWidth) paint();
+      grid.appendChild(frame);
+
+      const listWrap = el("div");
+      if (!(job.boxes || []).length) {
+        listWrap.appendChild(el("div", { className: "empty-row", text: job.outcome || "没有检测框" }));
+      } else {
+        const table = el("table", { className: "boxes" });
+        table.appendChild(el("thead", {}, [
+          el("tr", {}, [
+            el("th", { text: "框" }),
+            el("th", { text: "YOLO" }),
+            el("th", { text: "置信度" }),
+            el("th", { text: "Qwen 复核" }),
+            el("th", { text: "说明" })
+          ])
+        ]));
+        const tbody = el("tbody");
+        (job.boxes || []).forEach(box => {
+          const tr = el("tr", { className: box.flipped ? "flipped" : "" }, [
+            el("td", { className: "num", text: "#" + box.id }),
+            el("td", { text: box.yolo_class || "person" }),
+            el("td", { text: fmtConf(box.yolo_confidence) }),
+            el("td", { text: box.qwen_label || "未复核" }),
+            el("td", { text: box.qwen_description || "" })
+          ]);
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        listWrap.appendChild(table);
+      }
+
+      if ((job.qwen_passes || []).length > 1) {
+        const lines = (job.qwen_passes || []).map(pass => {
+          const bits = (pass.boxes || []).map(box => `#${box.id} ${box.qwen_label}`).join("，");
+          return `${pass.time || ""}  ${bits}`.trim();
+        });
+        listWrap.appendChild(el("div", { className: "history", text: "Qwen 多次复核：" + lines.join(" → ") }));
+      }
+
+      grid.appendChild(listWrap);
+      article.appendChild(grid);
+
+      const raw = el("details", { className: "raw" }, [
+        el("summary", { text: "原始 JSON" }),
+        el("pre", { text: JSON.stringify(job.raw || job, null, 2) })
+      ]);
+      article.appendChild(raw);
+      return article;
+    }
+
+    loadRuns();
+    setInterval(loadRuns, 8000);
+  </script>
+</body>
+</html>

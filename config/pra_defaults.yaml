@@ -1,0 +1,36 @@
+# uva_pra 演练工作台默认配置（可经 Web / API 覆盖，写入 pra_runtime.yaml）
+server:
+  host: "127.0.0.1"
+  port: 8030
+
+device:
+  # 本机无 GPU 时保持 false；连上 4080S 或迁到常驻服务器后改为 true
+  gpu_enabled: false
+  # Ollama 文本大模型（工作台备忘；千问 VL 复核仍走 runtime.QWEN_DIR_PATH）
+inference:
+  # 千问复核依赖 GPU；gpu_enabled=false 时即使为 true 也不会加载 VLM
+  vlm_enabled: false
+  yolo_enabled: true
+
+ingest:
+  rtmp_frame_interval_sec: 2.0
+  vlm_person_cooldown_sec: 2.0
+  # direct_local | edge_relay | remote_pull | simulate | file | image_folder
+  rtmp_mode: direct_local
+  # remote_pull 时使用；萤石等完整 rtmp://…?expire=…（勿拼 UVA_RTMP_USER）
+  rtmp_custom_pull_url: ""
+
+runtime:
+  SLICER_SIZE: 640
+  SLICER_OVERLAP_RATIO: 0.2
+  YOLO_CONF_THRESHOLD: 0.25
+
+push:
+  ims_enabled: false
+  feiliu_enabled: false
+  feiliu_mode: record_only
+  feiliu_url: "http://platform.example.com:8094/api/SMS/Data_Send_Warning_Msg_Sh"
+  feiliu_nest_id: ""
+  alert_type_to_algo_id:
+    钓鱼人: "11548"
+    游泳人: "11548"

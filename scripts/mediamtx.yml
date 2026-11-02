@@ -1,0 +1,15 @@
+logLevel: info
+rtmp: true
+rtmpAddress: :1935
+hls: false
+webrtc: false
+srt: false
+rtsp: false
+api: false
+metrics: false
+
+pathDefaults:
+  source: publisher
+
+paths:
+  all_others:

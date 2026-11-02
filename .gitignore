@@ -1,0 +1,25 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Runtime / weights / media (local only)
+data/runtime/
+model/**/*.pt
+model/**/._____temp/
+*.mp4
+*.mov
+*.srt
+
+config/pra_runtime.yaml
+
+# Edge bundle (large binary; download via deploy docs)
+deploy/edge/*.tar.gz
